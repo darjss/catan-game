@@ -1,0 +1,40 @@
+diff --git a/dist/index.js b/dist/index.js
+index db59b1b1ee892ae2eba5001365086f0a7365879d..462d4283edc625bc7d0c0c29b48383131771cc05 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -552,11 +552,11 @@ function getCanonicalEdgeId(v1, v2) {
+ function findVertexForPort(vertices, _port, legacyVertexId) {
+   const match = legacyVertexId.match(/(-?\d+)_(-?\d+)_v(\d+)/);
+   if (match) {
+-    const [, q, r, dir] = match;
+-    const direction = parseInt(dir);
++    const q = Number(match[1]);
++    const r = Number(match[2]);
+     const directionMap = ["N", "NE", "SE", "S", "SW", "NW"];
+-    const directionName = directionMap[direction];
+-    const canonicalId = `v_${q}_${r}_${directionName}`;
++    const direction = directionMap[Number(match[3])];
++    const canonicalId = getCanonicalVertexId({ q, r, s: -q - r, direction });
+     return vertices.get(canonicalId) || null;
+   }
+   return null;
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 011d486e622ab12134684f319107a05e1e7d13c4..8be91178af433ac795a426f57393c5abfcb46690 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -497,11 +497,11 @@ function getCanonicalEdgeId(v1, v2) {
+ function findVertexForPort(vertices, _port, legacyVertexId) {
+   const match = legacyVertexId.match(/(-?\d+)_(-?\d+)_v(\d+)/);
+   if (match) {
+-    const [, q, r, dir] = match;
+-    const direction = parseInt(dir);
++    const q = Number(match[1]);
++    const r = Number(match[2]);
+     const directionMap = ["N", "NE", "SE", "S", "SW", "NW"];
+-    const directionName = directionMap[direction];
+-    const canonicalId = `v_${q}_${r}_${directionName}`;
++    const direction = directionMap[Number(match[3])];
++    const canonicalId = getCanonicalVertexId({ q, r, s: -q - r, direction });
+     return vertices.get(canonicalId) || null;
+   }
+   return null;

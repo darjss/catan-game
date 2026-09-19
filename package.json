@@ -1,0 +1,49 @@
+{
+  "name": "example-fullstack",
+  "version": "0.0.0",
+  "description": "",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vp dev",
+    "build": "vp build",
+    "start": "node --env-file-if-exists=.env dist/server/node.js",
+    "serve": "vp preview",
+    "test": "vp test",
+    "lint": "vp lint src",
+    "prepare": "vp config"
+  },
+  "dependencies": {
+    "@ai-sdk/gateway": "^4.0.86",
+    "@remix-run/cookie": "^0.5.4",
+    "@solidjs/meta": "^1.0.0-next.2",
+    "@solidjs/router": "^2.0.0-next.26",
+    "@solidjs/web": "^2.0.0-rc.9",
+    "ai": "^7.0.106",
+    "catan-game-engine": "^0.3.0",
+    "solid-js": "^2.0.0-rc.9",
+    "valibot": "^1.4.2"
+  },
+  "devDependencies": {
+    "@solidjs/diagnostics": "^2.0.0-rc.9",
+    "@solidjs/start-devtools": "^1.0.0-next.4",
+    "@solidjs/testing-library": "^1.0.0-beta.3",
+    "@solidjs/vite-plugin": "^3.0.0-next.44",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@types/node": "^26.2.0",
+    "eslint-plugin-solid": "~0.18.0",
+    "filesystem-routing": "0.3.0",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.9.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:",
+    "vitest": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.2",
+      "onFail": "download"
+    }
+  }
+}
