@@ -12,6 +12,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
+    "paths": { "styled-system/*": ["./styled-system/*"] },
 
     // Type Checking & Safety
     "strict": true,

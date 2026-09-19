@@ -25,6 +25,7 @@
     "valibot": "^1.4.2"
   },
   "devDependencies": {
+    "@pandacss/dev": "^1.12.1",
     "@solidjs/diagnostics": "^2.0.0-rc.9",
     "@solidjs/start-devtools": "^1.0.0-next.4",
     "@solidjs/testing-library": "^1.0.0-beta.3",

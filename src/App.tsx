@@ -3,7 +3,7 @@ import { Loading } from "solid-js";
 // Typed client env, validated and baked in at build time (see env.ts).
 import { env } from "virtual:env/client";
 import { Router } from "./router";
-import "./App.css";
+import "./app.css";
 
 export default function App() {
   return (

@@ -1,0 +1,41 @@
+@layer reset, base, tokens, recipes, utilities;
+
+@layer base {
+  body {
+    background: var(--colors-table);
+    color: var(--colors-ink);
+    font-family: var(--fonts-game);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  svg {
+    display: block;
+  }
+}
+
+/* Legal build targets: a soft ring that breathes, not a flashing blob. */
+@keyframes ping-soft {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
