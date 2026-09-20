@@ -1,9 +1,9 @@
 // Single source of truth: Panda theme tokens and SVG art both read these.
 export const palette = {
-  table: "oklch(0.29 0.045 245)",
-  tableHi: "oklch(0.35 0.05 240)",
-  water1: "oklch(0.82 0.07 215)",
-  water2: "oklch(0.71 0.085 222)",
+  table: "oklch(0.3 0.045 185)",
+  tableHi: "oklch(0.36 0.05 180)",
+  water1: "oklch(0.83 0.075 208)",
+  water2: "oklch(0.7 0.09 218)",
   shore: "oklch(0.87 0.065 90)",
   paper: "oklch(0.97 0.012 88)",
   paperHi: "oklch(0.99 0.008 90)",

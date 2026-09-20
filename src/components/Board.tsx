@@ -21,7 +21,6 @@ import { palette } from "../palette";
 
 const PLAYER_COLOR: Record<string, string> = palette.player;
 
-// Hex ring: radius 1 is the tile; 1.1 is the sandy shore it sits on.
 function hexPointsR(center: { x: number; y: number }, r: number): string {
   const pts = [
     [0, -r],
@@ -45,7 +44,7 @@ export default function Board(props: {
 
   return (
     <svg
-      viewBox="-6.5 -5.15 13 10.3"
+      viewBox="-5.5 -4.9 11 9.8"
       role="img"
       aria-label="Catan board"
       style="width:100%;height:auto"
@@ -55,15 +54,40 @@ export default function Board(props: {
           <stop offset="0" stop-color={palette.water1} />
           <stop offset="1" stop-color={palette.water2} />
         </linearGradient>
+        {/* lamplight pooling in the middle of the sea */}
+        <radialGradient id="seaglow" cx="0.5" cy="0.42" r="0.75">
+          <stop offset="0" stop-color="oklch(1 0 0 / 0.10)" />
+          <stop offset="1" stop-color="oklch(1 0 0 / 0)" />
+        </radialGradient>
+        {/* printed-tile top light */}
+        <linearGradient id="tilelight" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="oklch(1 0 0 / 0.14)" />
+          <stop offset="0.5" stop-color="oklch(1 0 0 / 0.02)" />
+          <stop offset="1" stop-color="oklch(0 0 0 / 0.07)" />
+        </linearGradient>
+        <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="0.22" />
+        </filter>
         <clipPath id="hexclip">
           <polygon points={hexPointsR({ x: 0, y: 0 }, 1)} />
         </clipPath>
       </defs>
 
       {/* water */}
-      <rect x="-6.5" y="-5.15" width="13" height="10.3" rx="0.5" fill="url(#sea)" />
+      <rect x="-5.5" y="-4.9" width="11" height="9.8" rx="0.4" fill="url(#sea)" />
+      <rect x="-5.5" y="-4.9" width="11" height="9.8" rx="0.4" fill="url(#seaglow)" />
 
-      {/* shores — drawn under every tile so seams between land hexes vanish */}
+      {/* island shadow on the water */}
+      <ellipse
+        cx="0"
+        cy="0.28"
+        rx="4.15"
+        ry="3.55"
+        fill="oklch(0 0 0 / 0.18)"
+        filter="url(#soft)"
+      />
+
+      {/* shores under every tile */}
       <For each={props.snap.tiles}>
         {(t) => (
           <polygon
@@ -75,7 +99,7 @@ export default function Board(props: {
         )}
       </For>
 
-      {/* tiles + clipped terrain art */}
+      {/* tiles + clipped terrain art + top light */}
       <For each={props.snap.tiles}>
         {(t) => {
           const c = () => hexCenter(t);
@@ -90,6 +114,7 @@ export default function Board(props: {
               <g transform={`translate(${c().x} ${c().y})`} clip-path="url(#hexclip)">
                 <TileArt type={t.type} seed={t.id} />
               </g>
+              <polygon points={hexPointsR(c(), 1)} fill="url(#tilelight)" />
               <Show when={props.legal.tiles.has(t.id)}>
                 <polygon
                   points={hexPointsR(c(), 1)}
@@ -104,18 +129,12 @@ export default function Board(props: {
               </Show>
               <Show when={t.numberToken != null && !t.hasRobber}>
                 <g transform={`translate(${c().x} ${c().y})`}>
+                  <circle cy="0.05" r="0.37" fill="oklch(0 0 0 / 0.16)" />
                   <circle
                     r="0.36"
                     fill={palette.tokenDisc}
                     stroke={palette.tokenRing}
                     stroke-width="0.03"
-                  />
-                  <circle
-                    r="0.36"
-                    fill="none"
-                    stroke="oklch(0 0 0 / 0.08)"
-                    stroke-width="0.06"
-                    opacity="0.3"
                   />
                   <text
                     y="0.02"
@@ -144,14 +163,19 @@ export default function Board(props: {
                 </g>
               </Show>
               <Show when={t.hasRobber}>
-                <Robber x={c().x} y={c().y - 0.02} />
+                <g
+                  class="robber-move"
+                  style={`transform: translate(${c().x}px, ${c().y - 0.02}px)`}
+                >
+                  <Robber x={0} y={0} />
+                </g>
               </Show>
             </g>
           );
         }}
       </For>
 
-      {/* ports: paper badges floating just off the coast */}
+      {/* ports */}
       <For each={props.snap.ports}>
         {(p) => {
           const pos = () => {
@@ -165,7 +189,7 @@ export default function Board(props: {
         }}
       </For>
 
-      {/* roads */}
+      {/* roads — drawn on with a dash sweep */}
       <For each={props.snap.edges}>
         {(e) => {
           const [v1, v2] = edgeVertices(e.id);
@@ -181,6 +205,7 @@ export default function Board(props: {
                 stroke={colorOf(e.road!.playerId)}
                 stroke-width="0.17"
                 stroke-linecap="round"
+                class="piece-in"
               />
               <line
                 x1={a.x}
@@ -234,10 +259,14 @@ export default function Board(props: {
           return (
             <g>
               <Show when={v.structure?.type === "settlement"}>
-                <Settlement x={p.x} y={p.y} color={colorOf(v.structure!.playerId)} />
+                <g class="piece-in">
+                  <Settlement x={p.x} y={p.y} color={colorOf(v.structure!.playerId)} />
+                </g>
               </Show>
               <Show when={v.structure?.type === "city"}>
-                <City x={p.x} y={p.y} color={colorOf(v.structure!.playerId)} />
+                <g class="piece-in">
+                  <City x={p.x} y={p.y} color={colorOf(v.structure!.playerId)} />
+                </g>
               </Show>
               <Show when={props.legal.vertices.has(v.id)}>
                 <circle

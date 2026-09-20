@@ -1,5 +1,13 @@
 import { Title } from "@solidjs/meta";
-import { For, Show, createMemo, createSignal, onSettled, type ParentProps } from "solid-js";
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  onSettled,
+  type ParentProps,
+} from "solid-js";
 import { css, cva } from "styled-system/css";
 import Board from "../components/Board";
 import {
@@ -113,6 +121,29 @@ export default function Home() {
     const s = snapshot();
     return s?.winner ? s.players.find((p) => p.id === s.winner) : undefined;
   };
+  // Dice tumble into the tray on every roll — WAAPI so identical rolls replay.
+  createEffect(
+    () => snapshot()?.turn.diceRoll,
+    (r) => {
+      if (!r) return;
+      document.querySelectorAll("[data-dice] > *").forEach((el, i) =>
+        el.animate(
+          [
+            { transform: "translateY(-14px) rotate(-18deg) scale(0.85)", opacity: 0 },
+            { transform: "translateY(2px) rotate(4deg) scale(1.02)", opacity: 1, offset: 0.6 },
+            { transform: "translateY(0) rotate(0)" },
+          ],
+          {
+            duration: 340,
+            delay: i * 90,
+            easing: "cubic-bezier(0.23,1,0.32,1)",
+            fill: "backwards",
+          },
+        ),
+      );
+    },
+  );
+
   const mustDiscard = () => {
     const s = snapshot();
     return s?.turn.phase === "robberDiscard" && s.turn.mustDiscardPlayers.includes(HUMAN_ID);
@@ -171,8 +202,20 @@ export default function Home() {
             fontWeight: 900,
             color: "token(colors.paper)",
             letterSpacing: "-0.02em",
+            display: "flex",
+            alignItems: "center",
+            gap: "9px",
           })}
         >
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
+            <polygon
+              points="12,2 21,7 21,17 12,22 3,17 3,7"
+              fill={palette.accent}
+              stroke="oklch(1 0 0 / 0.4)"
+              stroke-width="1.4"
+              stroke-linejoin="round"
+            />
+          </svg>
           Catan
         </h1>
         <p
@@ -263,6 +306,11 @@ export default function Home() {
                     style={{
                       border: `2px solid ${active() ? (PLAYER_DOT[p.id] ?? palette.accent) : "transparent"}`,
                       padding: "10px 14px",
+                      transform: active() ? "translateY(-1px)" : "none",
+                      "box-shadow": active()
+                        ? "0 8px 20px oklch(0 0 0 / 0.28)"
+                        : "0 4px 14px oklch(0 0 0 / 0.18)",
+                      transition: "border-color 200ms, transform 200ms, box-shadow 200ms",
                     }}
                   >
                     <div
@@ -355,6 +403,7 @@ export default function Home() {
           <Show when={snapshot()?.turn.diceRoll}>
             {(d) => (
               <div
+                data-dice
                 class={panel}
                 style={{
                   display: "flex",
