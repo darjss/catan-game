@@ -247,38 +247,61 @@ export function Robber(p: { x: number; y: number }) {
   );
 }
 
-/** Port badge on the coast: paper chip, anchor mark, ratio. */
-export function PortBadge(p: { x: number; y: number; ratio: number }) {
+/** Port: a little wooden dock off the coast, crate + flag with the ratio. */
+export function PortBadge(p: { x: number; y: number; ratio: number; angle: number }) {
+  // Clamp the dock's tilt so the flag stays roughly upright.
+  const deg = Math.max(-32, Math.min(32, p.angle));
   return (
-    <g transform={`translate(${p.x} ${p.y})`}>
-      <rect
-        x="-0.3"
-        y="-0.16"
-        width="0.6"
-        height="0.32"
-        rx="0.1"
-        fill={palette.paper}
-        stroke={palette.shore}
-        stroke-width="0.03"
+    <g transform={`translate(${p.x} ${p.y}) rotate(${deg})`}>
+      {/* pier planks */}
+      <rect x="-0.34" y="-0.05" width="0.68" height="0.26" rx="0.05" fill="oklch(0.52 0.1 60)" />
+      <line
+        x1="-0.11"
+        y1="-0.05"
+        x2="-0.11"
+        y2="0.21"
+        stroke="oklch(0.4 0.08 55)"
+        stroke-width="0.02"
       />
-      <path
-        d="M-0.17 -0.06 a0.055 0.055 0 1 1 0.0 -0.001 M-0.17 -0.06 v0.14 m0 -0.2 l0.03 0.05 m-0.06 -0.05 l-0.03 0.05 m-0.07 0.08 a0.09 0.09 0 0 0 0.14 0"
-        stroke={palette.inkSoft}
+      <line
+        x1="0.11"
+        y1="-0.05"
+        x2="0.11"
+        y2="0.21"
+        stroke="oklch(0.4 0.08 55)"
+        stroke-width="0.02"
+      />
+      {/* crate */}
+      <rect
+        x="-0.2"
+        y="-0.3"
+        width="0.4"
+        height="0.28"
+        rx="0.04"
+        fill={palette.paper}
+        stroke="oklch(0.75 0.05 80)"
         stroke-width="0.025"
-        fill="none"
-        stroke-linecap="round"
       />
       <text
-        x="0.09"
-        y="0.01"
+        y="-0.15"
         text-anchor="middle"
         dominant-baseline="middle"
-        font-size="0.15"
+        font-size="0.17"
         font-weight="800"
         fill={palette.ink}
       >
         {p.ratio}:1
       </text>
+      {/* flag */}
+      <line
+        x1="0.24"
+        y1="-0.02"
+        x2="0.24"
+        y2="-0.34"
+        stroke="oklch(0.4 0.06 55)"
+        stroke-width="0.025"
+      />
+      <polygon points="0.24,-0.34 0.44,-0.28 0.24,-0.22" fill={palette.paper} />
     </g>
   );
 }
@@ -410,6 +433,35 @@ export function ResourceIcon(p: { type: ResourceType; size?: number }) {
           <path d="M10 14 l2.5 -1.5 l1.5 2.5 l-2.5 1.5 Z" fill="oklch(0.75 0.1 210)" />
         </g>
       )}
+    </svg>
+  );
+}
+
+/* ---------------- action glyphs (24x24, currentColor) ---------------- */
+
+export function ActionIcon(p: { name: string; size?: number }) {
+  const s = p.size ?? 20;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={s}
+      height={s}
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      style="display:inline-block;vertical-align:-0.25em"
+    >
+      {p.name === "road" && <path d="M4 19 L16 5 M7.5 16.5 l1.8 1.8 M12 12 l1.8 1.8" />}
+      {p.name === "settle" && <path d="M4 20 V11 L12 4 L20 11 V20 Z M10 20 v-5 h4 v5" />}
+      {p.name === "city" && (
+        <path d="M3 20 V10 h4 V5 h4 l2 -2 l2 2 h4 v5 h2 V20 Z M9 20 v-4 h3 v4" />
+      )}
+      {p.name === "dev" && <path d="M6 3 h9 l3 3 v15 h-12 Z M15 3 v3 h3 M9 12 l3 3 l4 -5" />}
+      {p.name === "trade" && <path d="M4 8 h13 m-3 -3 l3 3 l-3 3 M20 16 H7 m3 3 l-3 -3 l3 -3" />}
+      {p.name === "end" && <path d="M6 21 V4 m0 1 h11 l-3 4 l3 4 H6" />}
     </svg>
   );
 }

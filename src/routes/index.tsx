@@ -40,7 +40,7 @@ import {
   tradeRatio,
 } from "../game/controller";
 import { RESOURCE_TYPES, type ResourceType } from "../game/model";
-import { DieFace, ResourceIcon } from "../assets/art";
+import { ActionIcon, DieFace, ResourceIcon } from "../assets/art";
 import { palette } from "../palette";
 
 const CARD_NAMES: Record<string, string> = {
@@ -50,6 +50,14 @@ const CARD_NAMES: Record<string, string> = {
   monopoly: "Monopoly",
   victoryPoint: "Victory Point",
 };
+
+const PLAYER_DOT: Record<string, string> = palette.player;
+
+const panel = css({
+  background: "token(colors.paper)",
+  borderRadius: "card",
+  boxShadow: "0 4px 14px oklch(0.2 0.08 235 / 0.35)",
+});
 
 const btn = cva({
   base: {
@@ -80,7 +88,7 @@ const btn = cva({
       ghost: {
         background: "transparent",
         borderColor: "transparent",
-        color: "token(colors.inkSoft)",
+        color: "token(colors.paper)",
       },
     },
     sel: {
@@ -92,12 +100,7 @@ const btn = cva({
   },
 });
 
-const panel = css({
-  background: "token(colors.paper)",
-  borderRadius: "card",
-  padding: "12px 14px",
-  boxShadow: "0 4px 14px oklch(0 0 0 / 0.18)",
-});
+const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
 
 export default function Home() {
   onSettled(() => {
@@ -121,7 +124,7 @@ export default function Home() {
     const s = snapshot();
     return s?.winner ? s.players.find((p) => p.id === s.winner) : undefined;
   };
-  // Dice tumble into the tray on every roll — WAAPI so identical rolls replay.
+  // Dice tumble in on every roll — WAAPI so identical rolls replay.
   createEffect(
     () => snapshot()?.turn.diceRoll,
     (r) => {
@@ -129,8 +132,8 @@ export default function Home() {
       document.querySelectorAll("[data-dice] > *").forEach((el, i) =>
         el.animate(
           [
-            { transform: "translateY(-14px) rotate(-18deg) scale(0.85)", opacity: 0 },
-            { transform: "translateY(2px) rotate(4deg) scale(1.02)", opacity: 1, offset: 0.6 },
+            { transform: "translateY(-16px) rotate(-20deg) scale(0.85)", opacity: 0 },
+            { transform: "translateY(2px) rotate(5deg) scale(1.02)", opacity: 1, offset: 0.6 },
             { transform: "translateY(0) rotate(0)" },
           ],
           {
@@ -143,7 +146,6 @@ export default function Home() {
       );
     },
   );
-
   const mustDiscard = () => {
     const s = snapshot();
     return s?.turn.phase === "robberDiscard" && s.turn.mustDiscardPlayers.includes(HUMAN_ID);
@@ -154,8 +156,8 @@ export default function Home() {
     if (s.turn.phase === "setup") {
       return myTurn()
         ? s.turn.setupPhase?.includes("Settlement")
-          ? "Place a settlement — tap a glowing spot"
-          : "Place a road — tap a glowing edge"
+          ? "Place a settlement"
+          : "Place a road"
         : `${current()?.name} is setting up…`;
     }
     if (s.turn.phase === "robberDiscard") {
@@ -171,68 +173,90 @@ export default function Home() {
     if (pb === "knight") return "Knight: tap a hex for the robber";
     if (pb === "roadBuilding1") return "Road Building: tap an edge for road 1";
     if (pb === "roadBuilding2") return "Road Building: tap an edge for road 2";
-    if (pb) return `Tap a glowing ${pb === "road" ? "edge" : "spot"} to build — or cancel below`;
-    return "Your turn — build, trade, or end turn";
+    if (pb) return `Tap a glowing ${pb === "road" ? "edge" : "spot"} — or cancel below`;
+    return "Build, trade, or end turn";
   };
 
   return (
     <main
       class={css({
-        maxW: "1280px",
-        margin: "0 auto",
-        padding: "16px 20px 40px",
-        minH: "100vh",
-        display: "flex",
-        flexDir: "column",
+        height: "100vh",
+        display: "grid",
+        gridTemplateColumns: { base: "1fr", lg: "52px minmax(0,1fr) 300px" },
+        gridTemplateRows: { base: "auto auto auto", lg: "minmax(0,1fr) auto" },
+        overflow: "hidden",
       })}
     >
       <Title>Catan</Title>
-      <header
+
+      {/* left rail */}
+      <nav
         class={css({
           display: "flex",
+          flexDir: { base: "row", lg: "column" },
           alignItems: "center",
-          gap: "14px",
-          marginBottom: "14px",
+          gap: "10px",
+          padding: "10px 0",
+          gridRow: { lg: "1 / 3" },
         })}
       >
-        <h1
-          class={css({
-            margin: 0,
-            fontSize: "26px",
-            fontWeight: 900,
-            color: "token(colors.paper)",
-            letterSpacing: "-0.02em",
-            display: "flex",
-            alignItems: "center",
-            gap: "9px",
-          })}
+        <svg
+          viewBox="0 0 24 24"
+          width="26"
+          height="26"
+          aria-hidden="true"
+          class={css({ margin: "0 auto", display: "block" })}
         >
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">
-            <polygon
-              points="12,2 21,7 21,17 12,22 3,17 3,7"
-              fill={palette.accent}
-              stroke="oklch(1 0 0 / 0.4)"
-              stroke-width="1.4"
-              stroke-linejoin="round"
-            />
-          </svg>
-          Catan
-        </h1>
+          <polygon
+            points="12,2 21,7 21,17 12,22 3,17 3,7"
+            fill={palette.accent}
+            stroke="oklch(1 0 0 / 0.4)"
+            stroke-width="1.4"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <button
+          type="button"
+          title="New game"
+          aria-label="New game"
+          class={btn({ kind: "ghost" })}
+          onClick={() => newGame()}
+        >
+          ↺
+        </button>
+      </nav>
+
+      {/* board — the page is the sea, the svg is transparent */}
+      <section
+        class={css({
+          position: "relative",
+          minH: 0,
+          minW: 0,
+          display: "grid",
+          placeItems: "center",
+          padding: "8px",
+        })}
+      >
+        {/* floating prompt */}
         <p
           class={css({
-            flex: 1,
+            position: "absolute",
+            top: "18px",
+            left: "50%",
+            transform: "translateX(-50%)",
             margin: 0,
             fontSize: "14px",
-            fontWeight: 700,
+            fontWeight: 800,
             color: "token(colors.ink)",
             background: "token(colors.paper)",
             borderRadius: "full",
-            padding: "7px 16px",
-            textAlign: "center",
-            boxShadow: "0 2px 8px oklch(0 0 0 / 0.15)",
+            padding: "8px 18px",
+            boxShadow: "0 4px 14px oklch(0.2 0.08 235 / 0.35)",
+            zIndex: 2,
+            whiteSpace: "nowrap",
           })}
         >
-          <Show when={myTurn()} fallback={prompt()}>
+          <Show when={myTurn()}>
             <span
               class={css({
                 display: "inline-block",
@@ -241,286 +265,312 @@ export default function Home() {
                 borderRadius: "full",
                 background: "token(colors.accent)",
                 marginRight: "8px",
-                verticalAlign: "baseline",
               })}
             />
-            {prompt()}
           </Show>
+          {prompt()}
         </p>
-        <button
-          type="button"
-          class={btn({ kind: "ghost" })}
-          style="color: var(--colors-paper); opacity: 0.85"
-          onClick={() => newGame()}
-        >
-          New game
-        </button>
-      </header>
 
-      <div
+        <Show
+          when={snapshot()}
+          fallback={
+            <p class={css({ color: "token(colors.paper)", fontWeight: 700 })}>
+              Setting up the island…
+            </p>
+          }
+        >
+          {(s) => (
+            <Board
+              snap={s()}
+              legal={legal()}
+              onVertex={clickVertex}
+              onEdge={clickEdge}
+              onTile={clickTile}
+            />
+          )}
+        </Show>
+
+        {/* dice floating on the sea, low right of the island */}
+        <Show when={snapshot()?.turn.diceRoll}>
+          {(d) => (
+            <div
+              data-dice
+              class={css({
+                position: "absolute",
+                right: "6%",
+                bottom: "8%",
+                display: "flex",
+                gap: "8px",
+              })}
+            >
+              <DieFace value={d()[0]} size={46} />
+              <DieFace value={d()[1]} size={46} />
+            </div>
+          )}
+        </Show>
+      </section>
+
+      {/* right rail: players + log */}
+      <aside
         class={css({
-          display: "grid",
-          gridTemplateColumns: { base: "1fr", lg: "minmax(0,1fr) 320px" },
-          gap: "16px",
-          alignItems: "start",
+          display: "flex",
+          flexDir: "column",
+          gap: "10px",
+          padding: "14px 14px 14px 0",
+          minH: 0,
+          gridRow: { lg: "1 / 3" },
         })}
       >
-        <section
-          class={css({
-            borderRadius: "20px",
-            padding: "6px",
-            boxShadow: "0 6px 24px oklch(0 0 0 / 0.3), inset 0 1px 0 oklch(1 0 0 / 0.15)",
-          })}
-        >
-          <Show
-            when={snapshot()}
-            fallback={
-              <p
-                class={css({ padding: "40px", textAlign: "center", color: "token(colors.paper)" })}
-              >
-                Setting up the island…
-              </p>
-            }
-          >
-            {(s) => (
-              <Board
-                snap={s()}
-                legal={legal()}
-                onVertex={clickVertex}
-                onEdge={clickEdge}
-                onTile={clickTile}
-              />
-            )}
-          </Show>
-        </section>
-
-        <aside class={css({ display: "flex", flexDir: "column", gap: "12px", minH: 0 })}>
-          <section class={css({ display: "flex", flexDir: "column", gap: "8px" })}>
-            <For each={snapshot()?.players}>
-              {(p) => {
-                const active = () => current()?.id === p.id;
-                const thinking = () => botThinking() === p.name;
-                return (
-                  <div
-                    class={panel}
-                    style={{
-                      border: `2px solid ${active() ? (PLAYER_DOT[p.id] ?? palette.accent) : "transparent"}`,
-                      padding: "10px 14px",
-                      transform: active() ? "translateY(-1px)" : "none",
-                      "box-shadow": active()
-                        ? "0 8px 20px oklch(0 0 0 / 0.28)"
-                        : "0 4px 14px oklch(0 0 0 / 0.18)",
-                      transition: "border-color 200ms, transform 200ms, box-shadow 200ms",
-                    }}
+        <section class={css({ display: "flex", flexDir: "column", gap: "8px" })}>
+          <For each={snapshot()?.players}>
+            {(p) => {
+              const active = () => current()?.id === p.id;
+              const thinking = () => botThinking() === p.name;
+              return (
+                <div
+                  class={panel}
+                  style={{
+                    display: "flex",
+                    "align-items": "center",
+                    gap: "10px",
+                    padding: "10px 12px",
+                    border: `2px solid ${active() ? (PLAYER_DOT[p.id] ?? palette.accent) : "transparent"}`,
+                    transform: active() ? "translateY(-1px)" : "none",
+                    transition: "border-color 200ms, transform 200ms",
+                  }}
+                >
+                  <span
+                    class={css({
+                      width: "34px",
+                      height: "34px",
+                      borderRadius: "full",
+                      flexShrink: 0,
+                      display: "grid",
+                      placeItems: "center",
+                      fontWeight: 900,
+                      color: "token(colors.accentInk)",
+                    })}
+                    style={{ background: PLAYER_DOT[p.id] ?? palette.inkSoft }}
                   >
-                    <div
-                      class={css({
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                      })}
-                    >
-                      <span
-                        class={css({
-                          width: "12px",
-                          height: "12px",
-                          borderRadius: "full",
-                          flexShrink: 0,
-                        })}
-                        style={{ background: PLAYER_DOT[p.id] ?? palette.inkSoft }}
-                      />
-                      <span class={css({ fontWeight: 800, flex: 1 })}>
-                        {p.name}
-                        <Show when={thinking()}>
-                          <span class={css({ color: "token(colors.inkSoft)" })}> thinking…</span>
-                        </Show>
-                      </span>
-                      <span
-                        class={css({
-                          fontWeight: 900,
-                          fontSize: "17px",
-                          color: "token(colors.accent)",
-                          fontVariantNumeric: "tabular-nums",
-                        })}
-                      >
-                        {p.victoryPoints} VP
-                      </span>
-                    </div>
-                    <div
-                      class={css({
-                        display: "flex",
-                        gap: "10px",
-                        fontSize: "13px",
-                        color: "token(colors.inkSoft)",
-                        marginTop: "4px",
-                        alignItems: "center",
-                        flexWrap: "wrap",
-                      })}
-                    >
-                      <Show
-                        when={p.id === HUMAN_ID}
-                        fallback={
-                          <span>
-                            {RESOURCE_TYPES.reduce((n, r) => n + (p.resources[r] ?? 0), 0)} cards
-                          </span>
-                        }
-                      >
-                        <For each={RESOURCE_TYPES}>
-                          {(r) => (
-                            <span
-                              class={css({
-                                display: "inline-flex",
-                                gap: "3px",
-                                alignItems: "center",
-                              })}
-                            >
-                              <ResourceIcon type={r} size={15} />
-                              {p.resources[r]}
-                            </span>
-                          )}
-                        </For>
+                    {p.name.slice(0, 1)}
+                  </span>
+                  <span class={css({ flex: 1, minW: 0 })}>
+                    <span class={css({ display: "block", fontWeight: 800 })}>
+                      {p.name}
+                      <Show when={thinking()}>
+                        <span class={css({ color: "token(colors.inkSoft)", fontWeight: 500 })}>
+                          {" "}
+                          thinking…
+                        </span>
                       </Show>
+                    </span>
+                    <span
+                      class={css({
+                        display: "flex",
+                        gap: "9px",
+                        fontSize: "12px",
+                        color: "token(colors.inkSoft)",
+                      })}
+                    >
+                      <span>
+                        {RESOURCE_TYPES.reduce((n, r) => n + (p.resources[r] ?? 0), 0)} cards
+                      </span>
                       <Show when={p.devCards.filter((c) => !c.playedThisTurn).length > 0}>
                         <span>{p.devCards.filter((c) => !c.playedThisTurn).length} dev</span>
                       </Show>
                       <Show when={p.hasLongestRoad}>
-                        <span class={css({ fontWeight: 700, color: "token(colors.accent)" })}>
-                          longest road
+                        <span class={css({ color: "token(colors.accent)", fontWeight: 700 })}>
+                          longest
                         </span>
                       </Show>
                       <Show when={p.hasLargestArmy}>
-                        <span class={css({ fontWeight: 700, color: "token(colors.accent)" })}>
-                          largest army
+                        <span class={css({ color: "token(colors.accent)", fontWeight: 700 })}>
+                          army
                         </span>
                       </Show>
-                    </div>
-                  </div>
-                );
-              }}
-            </For>
-          </section>
+                    </span>
+                  </span>
+                  <span
+                    class={css({
+                      fontWeight: 900,
+                      fontSize: "20px",
+                      fontVariantNumeric: "tabular-nums",
+                    })}
+                  >
+                    {p.victoryPoints}
+                    <span
+                      class={css({
+                        fontSize: "11px",
+                        color: "token(colors.inkSoft)",
+                        marginLeft: "3px",
+                      })}
+                    >
+                      VP
+                    </span>
+                  </span>
+                </div>
+              );
+            }}
+          </For>
+        </section>
 
-          <Show when={snapshot()?.turn.diceRoll}>
-            {(d) => (
-              <div
-                data-dice
-                class={panel}
-                style={{
-                  display: "flex",
-                  gap: "10px",
-                  "justify-content": "center",
-                  padding: "12px",
-                }}
-              >
-                <DieFace value={d()[0]} size={44} />
-                <DieFace value={d()[1]} size={44} />
-              </div>
-            )}
-          </Show>
+        <section
+          class={panel}
+          style={{
+            flex: 1,
+            "min-height": 0,
+            "font-size": "13px",
+            color: "var(--colors-ink-soft)",
+            "overflow-y": "auto",
+            display: "flex",
+            "flex-direction": "column-reverse",
+            padding: "10px 14px",
+          }}
+        >
+          <For each={log()}>{(line) => <div class={css({ padding: "2px 0" })}>{line}</div>}</For>
+        </section>
+      </aside>
 
-          <Show when={myTurn() && phase() === "main"}>
-            <section class={css({ display: "flex", flexDir: "column", gap: "8px" })}>
-              <Show when={!rolled()}>
-                <button
-                  type="button"
-                  class={btn({ kind: "primary" })}
-                  style="width:100%;padding:13px;font-size:17px"
-                  onClick={rollDice}
-                >
-                  Roll dice
-                </button>
-              </Show>
-              <Show when={rolled()}>
+      {/* bottom tray: your hand + actions */}
+      <section
+        class={css({
+          display: "flex",
+          gap: "14px",
+          alignItems: "stretch",
+          padding: "0 14px 14px",
+          gridColumn: { lg: "2" },
+          flexWrap: "wrap",
+        })}
+      >
+        {/* hand of resource cards */}
+        <div class={css({ display: "flex", gap: "6px" })}>
+          <For each={RESOURCE_TYPES}>
+            {(r) => {
+              const n = () => me()?.resources[r] ?? 0;
+              return (
                 <div
                   class={css({
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "8px",
+                    width: "58px",
+                    borderRadius: "ctrl",
+                    background: "token(colors.paper)",
+                    display: "flex",
+                    flexDir: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "2px",
+                    padding: "8px 0 6px",
+                    boxShadow: "0 3px 10px oklch(0.2 0.08 235 / 0.3)",
                   })}
+                  style={{ opacity: n() > 0 ? 1 : 0.45 }}
+                  title={r}
                 >
-                  <button
-                    type="button"
-                    class={btn({ sel: pendingBuild() === "road" })}
-                    onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
+                  <ResourceIcon type={r} size={26} />
+                  <span
+                    class={css({
+                      fontWeight: 900,
+                      fontSize: "15px",
+                      fontVariantNumeric: "tabular-nums",
+                    })}
                   >
-                    Road
-                  </button>
-                  <button
-                    type="button"
-                    class={btn({ sel: pendingBuild() === "settlement" })}
-                    onClick={() =>
-                      setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")
-                    }
-                  >
-                    Settlement
-                  </button>
-                  <button
-                    type="button"
-                    class={btn({ sel: pendingBuild() === "city" })}
-                    onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
-                  >
-                    City
-                  </button>
-                  <button type="button" class={btn()} onClick={buyDevCard}>
-                    Dev card
-                  </button>
-                  <button type="button" class={btn()} onClick={() => setTradeOpen(true)}>
-                    Trade
-                  </button>
-                  <button type="button" class={btn({ kind: "primary" })} onClick={endTurn}>
-                    End turn
-                  </button>
+                    {n()}
+                  </span>
                 </div>
-                <Show
-                  when={me()?.devCards.some((c) => !c.playedThisTurn && c.type !== "victoryPoint")}
-                >
-                  <div class={css({ display: "flex", flexWrap: "wrap", gap: "6px" })}>
-                    <For
-                      each={me()!.devCards.filter(
-                        (c) => !c.playedThisTurn && c.type !== "victoryPoint",
-                      )}
-                    >
-                      {(c) => (
-                        <button
-                          type="button"
-                          class={btn()}
-                          style="font-size:13px;padding:5px 10px"
-                          onClick={() => playCard(c.type)}
-                        >
-                          {CARD_NAMES[c.type]}
-                        </button>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-                <Show when={pendingBuild()}>
+              );
+            }}
+          </For>
+        </div>
+
+        {/* actions */}
+        <div
+          class={css({
+            display: "flex",
+            gap: "8px",
+            alignItems: "center",
+            flex: 1,
+            justifyContent: "flex-end",
+            flexWrap: "wrap",
+          })}
+        >
+          <Show when={myTurn() && phase() === "main"}>
+            <Show when={!rolled()}>
+              <button
+                type="button"
+                class={btn({ kind: "primary" })}
+                style="padding:12px 20px;font-size:16px"
+                onClick={rollDice}
+              >
+                Roll dice
+              </button>
+            </Show>
+            <Show when={rolled()}>
+              <button
+                type="button"
+                class={btn({ sel: pendingBuild() === "road" })}
+                onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
+              >
+                <ActionIcon name="road" /> Road
+              </button>
+              <button
+                type="button"
+                class={btn({ sel: pendingBuild() === "settlement" })}
+                onClick={() =>
+                  setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")
+                }
+              >
+                <ActionIcon name="settle" /> Settlement
+              </button>
+              <button
+                type="button"
+                class={btn({ sel: pendingBuild() === "city" })}
+                onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
+              >
+                <ActionIcon name="city" /> City
+              </button>
+              <button type="button" class={btn()} onClick={buyDevCard}>
+                <ActionIcon name="dev" /> Dev
+              </button>
+              <button type="button" class={btn()} onClick={() => setTradeOpen(true)}>
+                <ActionIcon name="trade" /> Trade
+              </button>
+              <button
+                type="button"
+                class={btn({ kind: "primary" })}
+                style="padding:10px 18px"
+                onClick={endTurn}
+              >
+                <ActionIcon name="end" /> End turn
+              </button>
+            </Show>
+          </Show>
+          <Show when={me()?.devCards.some((c) => !c.playedThisTurn && c.type !== "victoryPoint")}>
+            <div class={css({ display: "flex", gap: "6px" })}>
+              <For
+                each={me()!.devCards.filter((c) => !c.playedThisTurn && c.type !== "victoryPoint")}
+              >
+                {(c) => (
                   <button
                     type="button"
-                    class={btn({ kind: "ghost" })}
-                    onClick={() => setPendingBuild(null)}
+                    class={btn()}
+                    style="font-size:13px;padding:6px 10px"
+                    onClick={() => playCard(c.type)}
                   >
-                    Cancel
+                    {CARD_NAMES[c.type]}
                   </button>
-                </Show>
-              </Show>
-            </section>
+                )}
+              </For>
+            </div>
           </Show>
-
-          <section
-            class={panel}
-            style={{
-              "font-size": "13px",
-              color: "var(--colors-inkSoft)",
-              "max-height": "240px",
-              "overflow-y": "auto",
-              display: "flex",
-              "flex-direction": "column-reverse",
-            }}
-          >
-            <For each={log()}>{(line) => <div class={css({ padding: "2px 0" })}>{line}</div>}</For>
-          </section>
-        </aside>
-      </div>
+          <Show when={pendingBuild()}>
+            <button
+              type="button"
+              class={btn({ kind: "ghost" })}
+              onClick={() => setPendingBuild(null)}
+            >
+              Cancel
+            </button>
+          </Show>
+        </div>
+      </section>
 
       {/* robber target picker */}
       <Show when={robberPick()}>
@@ -537,6 +587,7 @@ export default function Home() {
             <button
               type="button"
               class={btn({ kind: "ghost" })}
+              style="color:var(--colors-ink-soft)"
               onClick={() => pickRobberTarget(undefined)}
             >
               No one
@@ -590,17 +641,13 @@ export default function Home() {
   );
 }
 
-const PLAYER_DOT: Record<string, string> = palette.player;
-
-const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
-
 function Modal(props: ParentProps) {
   return (
     <div
       class={css({
         position: "fixed",
         inset: 0,
-        background: "oklch(0 0 0 / 0.5)",
+        background: "oklch(0.15 0.05 235 / 0.55)",
         display: "grid",
         placeItems: "center",
         zIndex: 10,
@@ -672,7 +719,12 @@ function TradeModal() {
         >
           Trade {tradeRatio(give())} {give()} for 1 {get()}
         </button>
-        <button type="button" class={btn({ kind: "ghost" })} onClick={() => setTradeOpen(false)}>
+        <button
+          type="button"
+          class={btn({ kind: "ghost" })}
+          style="color:var(--colors-ink-soft)"
+          onClick={() => setTradeOpen(false)}
+        >
           Cancel
         </button>
       </div>
@@ -788,7 +840,12 @@ function CardModal(props: { kind: "yearOfPlenty" | "monopoly" }) {
         >
           Play
         </button>
-        <button type="button" class={btn({ kind: "ghost" })} onClick={() => setCardPick(null)}>
+        <button
+          type="button"
+          class={btn({ kind: "ghost" })}
+          style="color:var(--colors-ink-soft)"
+          onClick={() => setCardPick(null)}
+        >
           Cancel
         </button>
       </div>

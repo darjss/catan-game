@@ -50,15 +50,6 @@ export default function Board(props: {
       style="width:100%;height:auto"
     >
       <defs>
-        <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color={palette.water1} />
-          <stop offset="1" stop-color={palette.water2} />
-        </linearGradient>
-        {/* lamplight pooling in the middle of the sea */}
-        <radialGradient id="seaglow" cx="0.5" cy="0.42" r="0.75">
-          <stop offset="0" stop-color="oklch(1 0 0 / 0.10)" />
-          <stop offset="1" stop-color="oklch(1 0 0 / 0)" />
-        </radialGradient>
         {/* printed-tile top light */}
         <linearGradient id="tilelight" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stop-color="oklch(1 0 0 / 0.14)" />
@@ -73,27 +64,23 @@ export default function Board(props: {
         </clipPath>
       </defs>
 
-      {/* water */}
-      <rect x="-5.5" y="-4.9" width="11" height="9.8" rx="0.4" fill="url(#sea)" />
-      <rect x="-5.5" y="-4.9" width="11" height="9.8" rx="0.4" fill="url(#seaglow)" />
-
-      {/* island shadow on the water */}
+      {/* island shadow on the water — the page itself is the sea */}
       <ellipse
         cx="0"
-        cy="0.28"
-        rx="4.15"
-        ry="3.55"
-        fill="oklch(0 0 0 / 0.18)"
+        cy="0.3"
+        rx="4.2"
+        ry="3.6"
+        fill="oklch(0.3 0.08 240 / 0.35)"
         filter="url(#soft)"
       />
 
-      {/* shores under every tile */}
+      {/* cream coastline under every tile — the sticker-outline look */}
       <For each={props.snap.tiles}>
         {(t) => (
           <polygon
-            points={hexPointsR(hexCenter(t), 1.1)}
-            fill={palette.shore}
-            stroke="oklch(0.8 0.06 85 / 0.6)"
+            points={hexPointsR(hexCenter(t), 1.17)}
+            fill={palette.paperHi}
+            stroke="oklch(0.82 0.05 85 / 0.7)"
             stroke-width="0.03"
           />
         )}
@@ -183,9 +170,14 @@ export default function Board(props: {
             const mx = (a.x + b.x) / 2;
             const my = (a.y + b.y) / 2;
             const len = Math.hypot(mx, my) || 1;
-            return { x: mx + (mx / len) * 0.42, y: my + (my / len) * 0.42 };
+            const ang = (Math.atan2(my, mx) * 180) / Math.PI;
+            return {
+              x: mx + (mx / len) * 0.4,
+              y: my + (my / len) * 0.4,
+              ang: ang + 90,
+            };
           };
-          return <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} />;
+          return <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} angle={pos().ang} />;
         }}
       </For>
 

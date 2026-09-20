@@ -2,7 +2,11 @@
 
 @layer base {
   body {
-    background: var(--colors-table);
+    background: radial-gradient(
+      ellipse 120% 90% at 50% 30%,
+      var(--colors-table-hi),
+      var(--colors-table)
+    );
     color: var(--colors-ink);
     font-family: var(--fonts-game);
     -webkit-font-smoothing: antialiased;
