@@ -169,40 +169,38 @@ export function PortBadge(p: { x: number; y: number; ratio: number; angle: numbe
       {/* crate with the ratio; typed ports carry a big resource icon on top */}
       <rect
         x="-0.24"
-        y={typed ? "-0.56" : "-0.3"}
+        y="-0.56"
         width="0.48"
-        height={typed ? "0.54" : "0.28"}
+        height="0.54"
         rx="0.05"
         fill={palette.paper}
         stroke="oklch(0.75 0.05 80)"
         stroke-width="0.025"
       />
       {typed ? (
-        <>
-          <SpriteImage type={p.res as ResourceType} x={-0.17} y={-0.53} size={0.34} />
-          <text
-            y="-0.1"
-            text-anchor="middle"
-            dominant-baseline="middle"
-            font-size="0.16"
-            font-weight="800"
-            fill={palette.ink}
-          >
-            {p.ratio}:1
-          </text>
-        </>
+        <SpriteImage type={p.res as ResourceType} x={-0.17} y={-0.53} size={0.34} />
       ) : (
         <text
-          y="-0.15"
+          y="-0.36"
           text-anchor="middle"
           dominant-baseline="middle"
-          font-size="0.17"
-          font-weight="800"
-          fill={palette.ink}
+          font-size="0.3"
+          font-weight="900"
+          fill={palette.inkSoft}
         >
-          {p.ratio}:1
+          ?
         </text>
       )}
+      <text
+        y="-0.1"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-size="0.16"
+        font-weight="800"
+        fill={palette.ink}
+      >
+        {p.ratio}:1
+      </text>
       {/* flag */}
       <line
         x1="0.32"
@@ -276,28 +274,44 @@ export function ResourceIcon(p: { type: ResourceType | "dev"; size?: number }) {
 
 export function ActionIcon(p: { name: string; size?: number }) {
   const s = p.size ?? 20;
+  // Solid wooden-piece silhouettes — they read at dock size, strokes don't.
   return (
     <svg
       viewBox="0 0 24 24"
       width={s}
       height={s}
       aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="2"
-      stroke-linecap="round"
-      stroke-linejoin="round"
+      fill="currentColor"
+      stroke="none"
       style="display:inline-block;vertical-align:-0.25em"
     >
-      {p.name === "road" && <path d="M4 19 L16 5 M7.5 16.5 l1.8 1.8 M12 12 l1.8 1.8" />}
-      {p.name === "settle" && <path d="M4 20 V11 L12 4 L20 11 V20 Z M10 20 v-5 h4 v5" />}
-      {p.name === "city" && (
-        <path d="M3 20 V10 h4 V5 h4 l2 -2 l2 2 h4 v5 h2 V20 Z M9 20 v-4 h3 v4" />
+      {p.name === "road" && (
+        <rect x="3" y="9.5" width="18" height="5.5" rx="1.6" transform="rotate(-30 12 12)" />
       )}
-      {p.name === "dev" && <path d="M6 3 h9 l3 3 v15 h-12 Z M15 3 v3 h3 M9 12 l3 3 l4 -5" />}
-      {p.name === "trade" && <path d="M4 8 h13 m-3 -3 l3 3 l-3 3 M20 16 H7 m3 3 l-3 -3 l3 -3" />}
-      {p.name === "end" && <path d="M6 21 V4 m0 1 h11 l-3 4 l3 4 H6" />}
-      {p.name === "cancel" && <path d="M6 6 l12 12 M18 6 L6 18" />}
+      {p.name === "settle" && <path d="M4 20 V11 L12 4 L20 11 V20 Z" />}
+      {p.name === "city" && (
+        <path d="M3 20 V11 L7 7 L11 11 V20 Z M11 20 V8 L15 4 L19 8 V20 Z M19 20 h2 v-6 h-2 Z" />
+      )}
+      {p.name === "dev" && (
+        <>
+          <rect x="5" y="3" width="14" height="18" rx="1.5" />
+          <path
+            d="M12 7 l1.4 3 3.2 .3 -2.4 2.1 .7 3.1 -2.9 -1.7 -2.9 1.7 .7 -3.1 -2.4 -2.1 3.2 -.3 Z"
+            fill="oklch(1 0 0 / 0.9)"
+            stroke="none"
+          />
+        </>
+      )}
+      {p.name === "trade" && (
+        <>
+          <path d="M4 9.5 a1.7 1.7 0 0 1 1.7 -1.7 H18 l-2.4 -2.4 L17.5 3.5 l4.5 4.5 -4.5 4.5 -1.9 -1.9 2.4 -2.4 H5.7 A1.7 1.7 0 0 1 4 9.5 Z" />
+          <path d="M20 14.5 a1.7 1.7 0 0 1 -1.7 1.7 H6 l2.4 2.4 -1.9 1.9 -4.5 -4.5 4.5 -4.5 1.9 1.9 -2.4 2.4 h12.3 a1.7 1.7 0 0 1 1.7 1.7 Z" />
+        </>
+      )}
+      {p.name === "end" && <path d="M5 21 V4 h1.8 v17 Z M7.5 4 h11.8 l-3.2 4.2 3.2 4.2 H7.5 Z" />}
+      {p.name === "cancel" && (
+        <path d="M6.2 4.5 L12 10.3 17.8 4.5 19.5 6.2 13.7 12 19.5 17.8 17.8 19.5 12 13.7 6.2 19.5 4.5 17.8 10.3 12 4.5 6.2 Z" />
+      )}
     </svg>
   );
 }
