@@ -166,54 +166,53 @@ export function PortBadge(p: { x: number; y: number; ratio: number; angle: numbe
         stroke="oklch(0.4 0.08 55)"
         stroke-width="0.02"
       />
-      {/* crate with the ratio; typed ports carry the resource art */}
+      {/* crate with the ratio; typed ports carry a big resource icon on top */}
       <rect
-        x="-0.2"
-        y="-0.3"
-        width="0.4"
-        height="0.28"
-        rx="0.04"
+        x="-0.24"
+        y={typed ? "-0.56" : "-0.3"}
+        width="0.48"
+        height={typed ? "0.54" : "0.28"}
+        rx="0.05"
         fill={palette.paper}
         stroke="oklch(0.75 0.05 80)"
         stroke-width="0.025"
       />
-      <text
-        y="-0.15"
-        text-anchor="middle"
-        dominant-baseline="middle"
-        font-size="0.17"
-        font-weight="800"
-        fill={palette.ink}
-      >
-        {p.ratio}:1
-      </text>
       {typed ? (
-        <SpriteImage type={p.res as ResourceType} x={0.2} y={-0.34} size={0.24} />
+        <>
+          <SpriteImage type={p.res as ResourceType} x={-0.17} y={-0.53} size={0.34} />
+          <text
+            y="-0.1"
+            text-anchor="middle"
+            dominant-baseline="middle"
+            font-size="0.16"
+            font-weight="800"
+            fill={palette.ink}
+          >
+            {p.ratio}:1
+          </text>
+        </>
       ) : (
         <text
-          x="0.32"
-          y="-0.24"
+          y="-0.15"
           text-anchor="middle"
           dominant-baseline="middle"
-          font-size="0.2"
-          font-weight="900"
-          fill={palette.paper}
-          stroke={palette.inkSoft}
-          stroke-width="0.01"
+          font-size="0.17"
+          font-weight="800"
+          fill={palette.ink}
         >
-          ?
+          {p.ratio}:1
         </text>
       )}
       {/* flag */}
       <line
-        x1="0.24"
+        x1="0.32"
         y1="-0.02"
-        x2="0.24"
+        x2="0.32"
         y2="-0.34"
         stroke="oklch(0.4 0.06 55)"
         stroke-width="0.025"
       />
-      <polygon points="0.24,-0.34 0.44,-0.28 0.24,-0.22" fill={palette.paper} />
+      <polygon points="0.32,-0.34 0.52,-0.28 0.32,-0.22" fill={palette.paper} />
     </g>
   );
 }
@@ -298,6 +297,7 @@ export function ActionIcon(p: { name: string; size?: number }) {
       {p.name === "dev" && <path d="M6 3 h9 l3 3 v15 h-12 Z M15 3 v3 h3 M9 12 l3 3 l4 -5" />}
       {p.name === "trade" && <path d="M4 8 h13 m-3 -3 l3 3 l-3 3 M20 16 H7 m3 3 l-3 -3 l3 -3" />}
       {p.name === "end" && <path d="M6 21 V4 m0 1 h11 l-3 4 l3 4 H6" />}
+      {p.name === "cancel" && <path d="M6 6 l12 12 M18 6 L6 18" />}
     </svg>
   );
 }

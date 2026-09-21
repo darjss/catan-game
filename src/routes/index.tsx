@@ -126,47 +126,6 @@ const btn = cva({
 
 const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
 
-/** Cost as little resource chips: painted icon + ×n when more than one.
- *  Resources the player can't cover get a red ring so the blocker reads
- *  at a glance — no tooltip needed. */
-function Cost(props: { kind: BuildKind; have?: Partial<Record<ResourceType, number>> }) {
-  return (
-    <span
-      class={css({ display: "inline-flex", gap: "3px", alignItems: "center", marginLeft: "4px" })}
-    >
-      <For each={RESOURCE_TYPES.filter((r) => (GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 0)}>
-        {(r) => {
-          const missing = () =>
-            props.have != null && (props.have[r] ?? 0) < (GAME_CONSTANTS.COSTS[props.kind][r] ?? 0);
-          return (
-            <span
-              class={css({
-                display: "inline-flex",
-                alignItems: "center",
-                borderRadius: "full",
-                boxShadow: "0 0 0 2px transparent",
-              })}
-              style={{
-                "box-shadow": missing()
-                  ? "0 0 0 2px var(--colors-danger)"
-                  : "0 0 0 2px transparent",
-              }}
-              title={missing() ? `Missing ${r}` : `${GAME_CONSTANTS.COSTS[props.kind][r]} ${r}`}
-            >
-              <ResourceIcon type={r} size={15} />
-              <Show when={(GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 1}>
-                <b class={css({ fontSize: "10px", marginLeft: "1px" })}>
-                  ×{GAME_CONSTANTS.COSTS[props.kind][r]}
-                </b>
-              </Show>
-            </span>
-          );
-        }}
-      </For>
-    </span>
-  );
-}
-
 function costText(kind: BuildKind) {
   return RESOURCE_TYPES.filter((r) => (GAME_CONSTANTS.COSTS[kind][r] ?? 0) > 0)
     .map((r) => `${GAME_CONSTANTS.COSTS[kind][r]} ${r}`)
@@ -225,11 +184,6 @@ export default function Home() {
   const winner = () => {
     const s = snapshot();
     return s?.winner ? s.players.find((p) => p.id === s.winner) : undefined;
-  };
-  const canAfford = (kind: BuildKind) => {
-    const r = me()?.resources;
-    if (!r) return false;
-    return RESOURCE_TYPES.every((t) => (r[t] ?? 0) >= (GAME_CONSTANTS.COSTS[kind][t] ?? 0));
   };
   // Dice tumble in on every roll — WAAPI so identical rolls replay.
   createEffect(
@@ -706,80 +660,65 @@ export default function Home() {
           </Show>
         </div>
 
-        {/* actions */}
+        {/* actions — one fixed row of icon tiles like the reference */}
         <div
           class={css({
             display: "flex",
             gap: "6px",
-            alignItems: "center",
+            alignItems: "stretch",
             flexShrink: 0,
-            flexWrap: "wrap",
-            justifyContent: "flex-end",
-            maxW: "330px",
           })}
         >
-          <Show when={myTurn() && phase() === "main" && rolled()}>
-            <button
-              type="button"
-              class={btn({ sel: pendingBuild() === "road" })}
-              disabled={!canPlaceNow("road")}
-              title={canAfford("road") ? "No open edge" : `Need ${costText("road")}`}
-              onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
-            >
-              <ActionIcon name="road" /> Road
-              <Cost kind="road" have={me()?.resources} />
-            </button>
-            <button
-              type="button"
-              class={btn({ sel: pendingBuild() === "settlement" })}
-              disabled={!canPlaceNow("settlement")}
-              title={canAfford("settlement") ? "No open spot" : `Need ${costText("settlement")}`}
-              onClick={() => setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")}
-            >
-              <ActionIcon name="settle" /> Settlement
-              <Cost kind="settlement" have={me()?.resources} />
-            </button>
-            <button
-              type="button"
-              class={btn({ sel: pendingBuild() === "city" })}
-              disabled={!canPlaceNow("city")}
-              title={canAfford("city") ? "No settlement to upgrade" : `Need ${costText("city")}`}
-              onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
-            >
-              <ActionIcon name="city" /> City
-              <Cost kind="city" have={me()?.resources} />
-            </button>
-            <button
-              type="button"
-              class={btn()}
-              disabled={!canBuyDevNow()}
-              title={canAfford("devCard") ? "Deck is empty" : `Need ${costText("devCard")}`}
-              onClick={buyDevCard}
-            >
-              <ResourceIcon type="dev" size={18} /> Dev
-              <Cost kind="devCard" have={me()?.resources} />
-            </button>
-            <button type="button" class={btn()} onClick={() => setTradeOpen(!tradeOpen())}>
-              <ActionIcon name="trade" /> Trade
-            </button>
-            <button
-              type="button"
-              class={btn({ kind: "primary" })}
-              style="padding:9px 16px"
-              onClick={endTurn}
-            >
-              <ActionIcon name="end" /> End turn
-            </button>
-            <Show when={pendingBuild()}>
-              <button
-                type="button"
-                class={btn({ kind: "ghost" })}
-                style="color:var(--colors-ink-soft)"
-                onClick={() => setPendingBuild(null)}
-              >
-                Cancel
-              </button>
-            </Show>
+          <ActionTile
+            icon="trade"
+            label="Trade with the bank"
+            sel={tradeOpen()}
+            disabled={!(myTurn() && phase() === "main" && rolled())}
+            onClick={() => setTradeOpen(!tradeOpen())}
+          />
+          <ActionTile
+            icon="dev"
+            label={`Buy development card — ${costText("devCard")}`}
+            disabled={!canBuyDevNow()}
+            onClick={buyDevCard}
+          />
+          <ActionTile
+            icon="road"
+            label={`Build road — ${costText("road")}`}
+            badge={15 - (me()?.roads.length ?? 0)}
+            sel={pendingBuild() === "road"}
+            disabled={!canPlaceNow("road")}
+            onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
+          />
+          <ActionTile
+            icon="settle"
+            label={`Build settlement — ${costText("settlement")}`}
+            badge={5 - (me()?.settlements.length ?? 0)}
+            sel={pendingBuild() === "settlement"}
+            disabled={!canPlaceNow("settlement")}
+            onClick={() => setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")}
+          />
+          <ActionTile
+            icon="city"
+            label={`Upgrade to city — ${costText("city")}`}
+            badge={4 - (me()?.cities.length ?? 0)}
+            sel={pendingBuild() === "city"}
+            disabled={!canPlaceNow("city")}
+            onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
+          />
+          <ActionTile
+            icon="end"
+            label="End turn"
+            accent
+            disabled={!(myTurn() && phase() === "main" && rolled())}
+            onClick={endTurn}
+          />
+          <Show when={pendingBuild()}>
+            <ActionTile
+              icon="cancel"
+              label="Cancel placement"
+              onClick={() => setPendingBuild(null)}
+            />
           </Show>
         </div>
       </section>
@@ -847,6 +786,77 @@ export default function Home() {
         )}
       </Show>
     </main>
+  );
+}
+
+/** Square action tile like the reference dock — icon, count badge, tooltip. */
+function ActionTile(props: {
+  icon: string;
+  label: string;
+  badge?: number;
+  sel?: boolean;
+  accent?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      title={props.label}
+      aria-label={props.label}
+      disabled={props.disabled}
+      onClick={props.onClick}
+      class={css({
+        position: "relative",
+        width: "52px",
+        height: "52px",
+        borderRadius: "ctrl",
+        display: "grid",
+        placeItems: "center",
+        cursor: "pointer",
+        fontSize: "22px",
+        border: "1px solid oklch(0 0 0 / 0.18)",
+        transitionProperty: "transform, background-color, box-shadow",
+        transitionDuration: "150ms",
+        transitionTimingFunction: "token(easings.out)",
+        _active: { transform: "translateY(1px) scale(0.95)" },
+        _disabled: { opacity: 0.35, cursor: "default" },
+      })}
+      style={{
+        background: props.accent
+          ? "var(--colors-accent)"
+          : props.sel
+            ? "var(--colors-paper)"
+            : "oklch(0.7 0.08 90 / 0.4)",
+        color: props.accent ? "var(--colors-accent-ink)" : "var(--colors-ink)",
+        "box-shadow": props.sel
+          ? "0 0 0 2px var(--colors-accent)"
+          : "0 2px 0 oklch(0.25 0.05 60 / 0.2)",
+      }}
+    >
+      <ActionIcon name={props.icon} size={24} />
+      <Show when={props.badge != null}>
+        <span
+          class={css({
+            position: "absolute",
+            top: "-5px",
+            right: "-4px",
+            minW: "17px",
+            textAlign: "center",
+            background: "token(colors.ink)",
+            color: "token(colors.paper)",
+            borderRadius: "full",
+            fontWeight: 800,
+            fontSize: "10px",
+            padding: "0 4px",
+            lineHeight: "17px",
+            fontVariantNumeric: "tabular-nums",
+          })}
+        >
+          {props.badge}
+        </span>
+      </Show>
+    </button>
   );
 }
 
