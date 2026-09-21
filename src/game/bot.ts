@@ -86,8 +86,9 @@ export async function botStep(game: Game, bot: PlayerState): Promise<void> {
     });
     const picked = moves.find((m) => m.id === choice);
     if (picked) ordered = [picked, ...ordered.filter((m) => m !== picked)];
-  } catch {
+  } catch (e) {
     // gateway down / no key — heuristics carry on
+    console.warn("[bot-ai] jev unavailable, using heuristic:", e);
   }
 
   for (const m of ordered.concat(moves)) {

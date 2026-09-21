@@ -30,5 +30,7 @@ export async function chooseBotMove(input: {
       },
     },
   });
-  return result.answers.move.choice;
+  const choice = result.answers.move.choice;
+  console.info(`[bot-ai] jev picked ${choice}`);
+  return choice;
 }
