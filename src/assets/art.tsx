@@ -107,10 +107,45 @@ export function Robber(p: { x: number; y: number }) {
   );
 }
 
-/** Port: a little wooden dock off the coast, crate + flag with the ratio. */
-export function PortBadge(p: { x: number; y: number; ratio: number; angle: number }) {
+/** A resource sprite cropped to its atlas cell, usable inside SVG. */
+export function SpriteImage(p: { type: ResourceType | "dev"; x: number; y: number; size: number }) {
+  // sprite cell origins in atlas pixels (3x2 of 512)
+  const CELL: Record<string, [number, number]> = {
+    wood: [0, 0],
+    brick: [512, 0],
+    sheep: [1024, 0],
+    wheat: [0, 512],
+    ore: [512, 512],
+    dev: [1024, 512],
+  };
+  const [cx, cy] = CELL[p.type] ?? CELL.dev;
+  return (
+    <svg
+      x={p.x}
+      y={p.y}
+      width={p.size}
+      height={p.size}
+      viewBox={`${cx} ${cy} 512 512`}
+      preserveAspectRatio="xMidYMid slice"
+    >
+      <image
+        href="/assets/resource-sprites.webp"
+        x="0"
+        y="0"
+        width="1536"
+        height="1024"
+        preserveAspectRatio="none"
+      />
+    </svg>
+  );
+}
+
+/** Port: a little wooden dock off the coast; the crate shows the ratio and,
+ *  for specialized ports, the resource it trades. */
+export function PortBadge(p: { x: number; y: number; ratio: number; angle: number; res?: string }) {
   // Clamp the dock's tilt so the flag stays roughly upright.
   const deg = Math.max(-32, Math.min(32, p.angle));
+  const typed = p.res && p.res !== "generic";
   return (
     <g transform={`translate(${p.x} ${p.y}) rotate(${deg})`}>
       {/* pier planks */}
@@ -131,7 +166,7 @@ export function PortBadge(p: { x: number; y: number; ratio: number; angle: numbe
         stroke="oklch(0.4 0.08 55)"
         stroke-width="0.02"
       />
-      {/* crate */}
+      {/* crate with the ratio; typed ports carry the resource art */}
       <rect
         x="-0.2"
         y="-0.3"
@@ -152,6 +187,23 @@ export function PortBadge(p: { x: number; y: number; ratio: number; angle: numbe
       >
         {p.ratio}:1
       </text>
+      {typed ? (
+        <SpriteImage type={p.res as ResourceType} x={0.2} y={-0.34} size={0.24} />
+      ) : (
+        <text
+          x="0.32"
+          y="-0.24"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          font-size="0.2"
+          font-weight="900"
+          fill={palette.paper}
+          stroke={palette.inkSoft}
+          stroke-width="0.01"
+        >
+          ?
+        </text>
+      )}
       {/* flag */}
       <line
         x1="0.24"

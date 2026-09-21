@@ -26,7 +26,16 @@ let game: Game | null = null;
 let rbFirstEdge: string | null = null;
 
 const [snapshot, setSnapshot] = createSignal<Snapshot | null>(null);
-const [log, setLog] = createSignal<string[]>([]);
+
+/** One log line: an icon, the acting player (for name color), and parts —
+ *  plain text interleaved with resource icons and die faces. */
+export type LogPart = string | { res: ResourceType } | { die: number };
+export interface LogEntry {
+  icon: string;
+  actor?: string;
+  parts: LogPart[];
+}
+const [log, setLog] = createSignal<LogEntry[]>([]);
 const [botThinking, setBotThinking] = createSignal<string | null>(null);
 const [pendingBuild, setPendingBuild] = createSignal<PendingBuild>(null);
 const [robberPick, setRobberPick] = createSignal<{ hexId: string; targets: PlayerState[] } | null>(
@@ -62,60 +71,132 @@ export function playerName(snap: Snapshot, id: string): string {
   return snap.players.find((p) => p.id === id)?.name ?? id;
 }
 
-function pushLog(line: string) {
-  setLog((l) => [...l.slice(-120), line]);
+function pushEntry(entry: LogEntry) {
+  setLog((l) => [...l.slice(-120), entry]);
 }
 
-function describeEvent(snap: Snapshot, ev: GameEvent): string | null {
-  const name = (id: string) => playerName(snap, id);
-  const res = (r?: Partial<Record<ResourceType, number>>) =>
-    r
-      ? Object.entries(r)
-          .filter(([, n]) => n)
-          .map(([k, n]) => `${n} ${k}`)
-          .join(", ")
-      : "";
+function resParts(r?: Partial<Record<ResourceType, number>>): LogPart[] {
+  if (!r) return [];
+  return Object.entries(r)
+    .filter(([, n]) => n)
+    .flatMap(([k, n]) => [{ res: k as ResourceType }, ` ×${n}`] as LogPart[]);
+}
+
+function describeEvent(snap: Snapshot, ev: GameEvent): LogEntry | null {
   switch (ev.type) {
     case "diceRolled":
-      return `${name(ev.playerId)} rolled ${ev.total}${ev.total === 7 ? " — robber!" : ""}`;
+      return {
+        icon: "dice",
+        actor: ev.playerId,
+        parts: [
+          " rolled ",
+          { die: ev.dice1 },
+          { die: ev.dice2 },
+          ev.total === 7 ? " — robber!" : "",
+        ],
+      };
     case "settlementBuilt":
-      return `${name(ev.playerId)} built a settlement`;
+      return { icon: "settle", actor: ev.playerId, parts: [" placed a settlement"] };
     case "cityBuilt":
-      return `${name(ev.playerId)} upgraded to a city`;
+      return { icon: "city", actor: ev.playerId, parts: [" upgraded to a city"] };
     case "roadBuilt":
-      return `${name(ev.playerId)} built a road`;
+      return { icon: "road", actor: ev.playerId, parts: [" placed a road"] };
     case "devCardBought":
-      return `${name(ev.playerId)} bought a development card`;
-    case "devCardPlayed":
-      return `${name(ev.playerId)} played ${ev.cardType}`;
-    case "resourcesGained":
-      return ev.reason === "diceRoll" ? `${name(ev.playerId)} gained ${res(ev.resources)}` : null;
-    case "resourcesDiscarded":
-      return `${name(ev.playerId)} discarded ${res(ev.resources)}`;
-    case "robberMoved":
-      return `${name(ev.playerId)} moved the robber`;
-    case "playerStole":
-      return `${name(ev.stealerId)} stole from ${name(ev.victimId)}`;
-    case "tradeWithBank":
-      return `${name(ev.playerId)} traded ${res(ev.gave)} for ${res(ev.received)}`;
-    case "longestRoadChanged":
-      return ev.playerId ? `${name(ev.playerId)} took longest road` : null;
-    case "largestArmyChanged":
-      return ev.playerId ? `${name(ev.playerId)} took largest army` : null;
+      return { icon: "dev", actor: ev.playerId, parts: [" bought a development card"] };
     case "gameEnded":
-      return `${name(ev.winnerId)} wins!`;
+      return { icon: "flag", actor: ev.winnerId, parts: [" wins!"] };
     default:
       return null;
   }
 }
 
 let flashToken = 0;
+let prevSnap: Snapshot | null = null;
+
+/** The engine only records builds, buys, rolls, and turn boundaries to
+ *  history. Robber moves, steals, discards, bank trades, dev-card plays and
+ *  road/army swings are silent, so diff consecutive snapshots for them. */
+function logDiff(prev: Snapshot, snap: Snapshot, hadBuild: boolean, hadRoll: boolean) {
+  // The player whose action caused this refresh — endTurn flips the index,
+  // so read the actor from the *previous* state's current player.
+  const actor = prev.players[prev.turn.currentPlayerIndex]?.id;
+
+  // dev card played: a type count dropped
+  for (const p of snap.players) {
+    const before = prev.players.find((q) => q.id === p.id);
+    if (!before) continue;
+    for (const type of ["knight", "roadBuilding", "yearOfPlenty", "monopoly"] as const) {
+      const was = before.devCards.filter((c) => c.type === type).length;
+      const is = p.devCards.filter((c) => c.type === type).length;
+      if (is < was) pushEntry({ icon: "dev", actor: p.id, parts: [` played ${CARD_LABEL[type]}`] });
+    }
+  }
+
+  const robberMoved =
+    prev.tiles.find((t) => t.hasRobber)?.id !== snap.tiles.find((t) => t.hasRobber)?.id;
+  if (robberMoved) {
+    pushEntry({ icon: "robber", actor, parts: [" moved the robber"] });
+    const victim = snap.players.find(
+      (p) =>
+        p.id !== actor && handSize(p) === handSize(prev.players.find((q) => q.id === p.id)!) - 1,
+    );
+    if (victim) pushEntry({ icon: "robber", actor, parts: [" stole from ", victim.name] });
+  }
+
+  // resource diffs per player → discards and bank trades
+  for (const p of snap.players) {
+    const before = prev.players.find((q) => q.id === p.id);
+    if (!before) continue;
+    const lost: Partial<Record<ResourceType, number>> = {};
+    const got: Partial<Record<ResourceType, number>> = {};
+    for (const r of RESOURCE_TYPES) {
+      const d = (before.resources[r] ?? 0) - (p.resources[r] ?? 0);
+      if (d > 0) lost[r] = d;
+      else if (d < 0) got[r] = -d;
+    }
+    const lostN = Object.values(lost).reduce((a, b) => a + b, 0);
+    const gotN = Object.values(got).reduce((a, b) => a + b, 0);
+    if (lostN === 0) continue;
+    // steal victim already narrated
+    if (robberMoved && p.id !== actor && lostN === 1 && gotN === 0) continue;
+    if (prev.turn.phase === "robberDiscard" && gotN === 0) {
+      pushEntry({ icon: "gain", actor: p.id, parts: [" discarded ", ...resParts(lost)] });
+    } else if (!hadBuild && !hadRoll && !robberMoved && gotN > 0 && p.id === actor) {
+      pushEntry({
+        icon: "trade",
+        actor: p.id,
+        parts: [" gave ", ...resParts(lost), ", got ", ...resParts(got)],
+      });
+    }
+  }
+
+  for (const p of snap.players) {
+    const before = prev.players.find((q) => q.id === p.id);
+    if (!before) continue;
+    if (p.hasLongestRoad && !before.hasLongestRoad)
+      pushEntry({ icon: "road", actor: p.id, parts: [" took longest road"] });
+    if (p.hasLargestArmy && !before.hasLargestArmy)
+      pushEntry({ icon: "dev", actor: p.id, parts: [" took largest army"] });
+  }
+}
+
+const CARD_LABEL: Record<string, string> = {
+  knight: "a knight",
+  roadBuilding: "road building",
+  yearOfPlenty: "year of plenty",
+  monopoly: "monopoly",
+};
 
 function refresh() {
   if (!game) return;
   const snap = takeSnapshot(game.getState());
   setSnapshot(snap);
-  for (const ev of game.getHistory().slice(seenEvents)) {
+  const fresh = game.getHistory().slice(seenEvents);
+  const hadBuild = fresh.some((e) =>
+    ["settlementBuilt", "cityBuilt", "roadBuilt", "devCardBought"].includes(e.type),
+  );
+  const hadRoll = fresh.some((e) => e.type === "diceRolled");
+  for (const ev of fresh) {
     if (ev.type === "diceRolled" && ev.total !== 7) {
       const produced = new Set(
         snap.tiles.filter((t) => t.numberToken === ev.total && !t.hasRobber).map((t) => t.id),
@@ -126,8 +207,8 @@ function refresh() {
         if (flashToken === token) setProducedTiles(new Set<string>());
       }, 1400);
     }
-    const line = describeEvent(snap, ev);
-    if (line) pushLog(line);
+    const entry = describeEvent(snap, ev);
+    if (entry) pushEntry(entry);
     // The engine doesn't emit per-player gain events — derive them from the
     // board: 1 card per settlement, 2 per city on each producing hex.
     if (ev.type === "diceRolled" && ev.total !== 7) {
@@ -143,12 +224,17 @@ function refresh() {
         }
       }
       for (const [pid, res] of gains) {
-        const text = [...res].map(([r, n]) => `${n} ${r}`).join(", ");
-        pushLog(`${playerName(snap, pid)} gained ${text}`);
+        pushEntry({
+          icon: "gain",
+          actor: pid,
+          parts: [" got ", ...resParts(Object.fromEntries(res))],
+        });
       }
     }
   }
   seenEvents = game.getHistory().length;
+  if (prevSnap) logDiff(prevSnap, snap, hadBuild, hadRoll);
+  prevSnap = snap;
 }
 
 let seenEvents = 0;
@@ -246,6 +332,7 @@ function pickSeed(): number {
 export function newGame(yourName = "You") {
   game = new Game([yourName, ...BOT_NAMES], pickSeed());
   seenEvents = 0;
+  prevSnap = null;
   setLog([]);
   setPendingBuild(null);
   setRobberPick(null);
@@ -253,7 +340,7 @@ export function newGame(yourName = "You") {
   setCardPick(null);
   rbFirstEdge = null;
   refresh();
-  pushLog("New game — place your first settlement");
+  pushEntry({ icon: "flag", parts: ["New game — place your first settlement"] });
   void driveBots();
 }
 

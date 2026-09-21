@@ -216,7 +216,7 @@ export default function Board(props: {
                   />
                 )}
               </For>
-              <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} angle={pos().ang} />
+              <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} angle={pos().ang} res={p.type} />
             </g>
           );
         }}
