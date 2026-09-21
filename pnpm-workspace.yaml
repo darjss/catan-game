@@ -29,3 +29,4 @@ patchedDependencies:
   catan-game-engine@0.3.0: patches/catan-game-engine@0.3.0.patch
 allowBuilds:
   esbuild: set this to true or false
+  workerd: set this to true or false
