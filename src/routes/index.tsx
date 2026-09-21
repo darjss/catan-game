@@ -9,6 +9,7 @@ import {
   type ParentProps,
 } from "solid-js";
 import { css, cva } from "styled-system/css";
+import { GAME_CONSTANTS } from "catan-game-engine";
 import Board from "../components/Board";
 import {
   HUMAN_ID,
@@ -40,7 +41,7 @@ import {
   tradeRatio,
 } from "../game/controller";
 import { RESOURCE_TYPES, type ResourceType } from "../game/model";
-import { ActionIcon, DieFace, ResourceIcon } from "../assets/art";
+import { ActionIcon, DieFace, ResourceIcon, TERRAIN_BASE } from "../assets/art";
 import { palette } from "../palette";
 
 const CARD_NAMES: Record<string, string> = {
@@ -51,30 +52,37 @@ const CARD_NAMES: Record<string, string> = {
   victoryPoint: "Victory Point",
 };
 
+type BuildKind = keyof typeof GAME_CONSTANTS.COSTS;
+
 const PLAYER_DOT: Record<string, string> = palette.player;
 
 const panel = css({
   background: "token(colors.paper)",
   borderRadius: "card",
-  boxShadow: "0 4px 14px oklch(0.2 0.08 235 / 0.35)",
+  border: "1px solid oklch(0 0 0 / 0.12)",
+  boxShadow: "0 3px 0 oklch(0.25 0.05 60 / 0.25), 0 10px 24px oklch(0.15 0.06 235 / 0.3)",
 });
 
 const btn = cva({
   base: {
     font: "inherit",
-    fontWeight: 700,
+    fontWeight: 800,
     borderRadius: "ctrl",
     padding: "8px 12px",
     cursor: "pointer",
-    border: "1px solid token(colors.line)",
+    border: "1px solid token(colors.timberDark)",
     background: "token(colors.paperHi)",
     color: "token(colors.ink)",
+    boxShadow: "0 2px 0 oklch(0.25 0.05 60 / 0.3)",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "6px",
     transitionProperty: "transform, background-color, box-shadow",
     transitionDuration: "150ms",
     transitionTimingFunction: "token(easings.out)",
     _hover: { background: "token(colors.paper)" },
-    _active: { transform: "scale(0.96)" },
-    _disabled: { opacity: 0.45, cursor: "default" },
+    _active: { transform: "translateY(1px) scale(0.97)", boxShadow: "none" },
+    _disabled: { opacity: 0.45, cursor: "default", boxShadow: "none" },
   },
   variants: {
     kind: {
@@ -83,12 +91,14 @@ const btn = cva({
         background: "token(colors.accent)",
         color: "token(colors.accentInk)",
         borderColor: "token(colors.accentDeep)",
+        boxShadow: "0 3px 0 token(colors.accentDeep)",
         _hover: { background: "token(colors.accentDeep)" },
       },
       ghost: {
         background: "transparent",
-        borderColor: "transparent",
+        borderColor: "oklch(1 0 0 / 0.25)",
         color: "token(colors.paper)",
+        boxShadow: "none",
       },
     },
     sel: {
@@ -101,6 +111,33 @@ const btn = cva({
 });
 
 const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
+
+/** One small painted dot per unit of cost — readable at a glance. */
+function CostDots(props: { kind: BuildKind }) {
+  return (
+    <span
+      class={css({ display: "inline-flex", gap: "3px", alignItems: "center", marginLeft: "2px" })}
+    >
+      <For each={RESOURCE_TYPES}>
+        {(r) => (
+          <For each={Array.from({ length: GAME_CONSTANTS.COSTS[props.kind][r] ?? 0 })}>
+            {() => (
+              <span
+                class={css({
+                  width: "9px",
+                  height: "9px",
+                  borderRadius: "3px",
+                  boxShadow: "inset 0 0 0 1px oklch(0 0 0 / 0.25)",
+                })}
+                style={{ background: TERRAIN_BASE[r] }}
+              />
+            )}
+          </For>
+        )}
+      </For>
+    </span>
+  );
+}
 
 export default function Home() {
   onSettled(() => {
@@ -124,11 +161,17 @@ export default function Home() {
     const s = snapshot();
     return s?.winner ? s.players.find((p) => p.id === s.winner) : undefined;
   };
+  const canAfford = (kind: BuildKind) => {
+    const r = me()?.resources;
+    if (!r) return false;
+    return RESOURCE_TYPES.every((t) => (r[t] ?? 0) >= (GAME_CONSTANTS.COSTS[kind][t] ?? 0));
+  };
   // Dice tumble in on every roll — WAAPI so identical rolls replay.
   createEffect(
     () => snapshot()?.turn.diceRoll,
     (r) => {
       if (!r) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       document.querySelectorAll("[data-dice] > *").forEach((el, i) =>
         el.animate(
           [
@@ -182,9 +225,11 @@ export default function Home() {
       class={css({
         height: "100vh",
         display: "grid",
-        gridTemplateColumns: { base: "1fr", lg: "52px minmax(0,1fr) 300px" },
-        gridTemplateRows: { base: "auto auto auto", lg: "minmax(0,1fr) auto" },
-        overflow: "hidden",
+        gridTemplateColumns: { base: "1fr", lg: "56px minmax(0,1fr) 300px" },
+        gridTemplateRows: { base: "auto auto auto auto", lg: "minmax(0,1fr) auto" },
+        gap: { base: "10px", lg: "14px" },
+        padding: { base: "10px", lg: "14px" },
+        overflow: { base: "auto", lg: "hidden" },
       })}
     >
       <Title>Catan</Title>
@@ -196,7 +241,7 @@ export default function Home() {
           flexDir: { base: "row", lg: "column" },
           alignItems: "center",
           gap: "10px",
-          padding: "10px 0",
+          padding: { lg: "4px 0" },
           gridRow: { lg: "1 / 3" },
         })}
       >
@@ -205,7 +250,7 @@ export default function Home() {
           width="26"
           height="26"
           aria-hidden="true"
-          class={css({ margin: "0 auto", display: "block" })}
+          class={css({ margin: { lg: "0 auto" }, display: "block" })}
         >
           <polygon
             points="12,2 21,7 21,17 12,22 3,17 3,7"
@@ -230,44 +275,47 @@ export default function Home() {
       <section
         class={css({
           position: "relative",
-          minH: 0,
+          gridColumn: { lg: "2" },
+          gridRow: { lg: "1" },
+          minH: { base: "52vh", lg: 0 },
           minW: 0,
           display: "grid",
           placeItems: "center",
-          padding: "8px",
         })}
       >
-        {/* floating prompt */}
+        {/* turn banner */}
         <p
           class={css({
             position: "absolute",
-            top: "18px",
+            top: "10px",
             left: "50%",
             transform: "translateX(-50%)",
             margin: 0,
             fontSize: "14px",
             fontWeight: 800,
-            color: "token(colors.ink)",
-            background: "token(colors.paper)",
+            color: "token(colors.paperHi)",
+            background: "token(colors.timberDark)",
+            border: "1px solid token(colors.timber)",
             borderRadius: "full",
             padding: "8px 18px",
-            boxShadow: "0 4px 14px oklch(0.2 0.08 235 / 0.35)",
+            boxShadow: "0 3px 0 oklch(0 0 0 / 0.25), 0 8px 18px oklch(0.1 0.05 235 / 0.4)",
             zIndex: 2,
             whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           })}
         >
-          <Show when={myTurn()}>
-            <span
-              class={css({
-                display: "inline-block",
-                width: "8px",
-                height: "8px",
-                borderRadius: "full",
-                background: "token(colors.accent)",
-                marginRight: "8px",
-              })}
-            />
-          </Show>
+          <span
+            class={css({
+              display: "inline-block",
+              width: "10px",
+              height: "10px",
+              borderRadius: "full",
+              boxShadow: "0 0 0 2px oklch(1 0 0 / 0.25)",
+            })}
+            style={{ background: PLAYER_DOT[current()?.id ?? ""] ?? palette.inkSoft }}
+          />
           {prompt()}
         </p>
 
@@ -290,33 +338,33 @@ export default function Home() {
           )}
         </Show>
 
-        {/* dice floating on the sea, low right of the island */}
+        {/* dice resting on the sea, low right of the island */}
         <Show when={snapshot()?.turn.diceRoll}>
           {(d) => (
             <div
               data-dice
               class={css({
                 position: "absolute",
-                right: "6%",
-                bottom: "8%",
+                right: "5%",
+                bottom: "6%",
                 display: "flex",
                 gap: "8px",
+                filter: "drop-shadow(0 6px 8px oklch(0.1 0.05 235 / 0.45))",
               })}
             >
-              <DieFace value={d()[0]} size={46} />
-              <DieFace value={d()[1]} size={46} />
+              <DieFace value={d()[0]} size={52} />
+              <DieFace value={d()[1]} size={52} />
             </div>
           )}
         </Show>
       </section>
 
-      {/* right rail: players + log */}
+      {/* right rail: players + activity */}
       <aside
         class={css({
           display: "flex",
           flexDir: "column",
           gap: "10px",
-          padding: "14px 14px 14px 0",
           minH: 0,
           gridRow: { lg: "1 / 3" },
         })}
@@ -333,29 +381,33 @@ export default function Home() {
                     display: "flex",
                     "align-items": "center",
                     gap: "10px",
-                    padding: "10px 12px",
-                    border: `2px solid ${active() ? (PLAYER_DOT[p.id] ?? palette.accent) : "transparent"}`,
+                    padding: "8px 12px",
+                    "border-color": active()
+                      ? (PLAYER_DOT[p.id] ?? palette.accent)
+                      : "oklch(0 0 0 / 0.12)",
+                    "border-width": "2px",
                     transform: active() ? "translateY(-1px)" : "none",
                     transition: "border-color 200ms, transform 200ms",
                   }}
                 >
                   <span
                     class={css({
-                      width: "34px",
-                      height: "34px",
+                      width: "32px",
+                      height: "32px",
                       borderRadius: "full",
                       flexShrink: 0,
                       display: "grid",
                       placeItems: "center",
                       fontWeight: 900,
                       color: "token(colors.accentInk)",
+                      boxShadow: "inset 0 -2px 0 oklch(0 0 0 / 0.2)",
                     })}
                     style={{ background: PLAYER_DOT[p.id] ?? palette.inkSoft }}
                   >
                     {p.name.slice(0, 1)}
                   </span>
                   <span class={css({ flex: 1, minW: 0 })}>
-                    <span class={css({ display: "block", fontWeight: 800 })}>
+                    <span class={css({ display: "block", fontWeight: 800, lineHeight: 1.2 })}>
                       {p.name}
                       <Show when={thinking()}>
                         <span class={css({ color: "token(colors.inkSoft)", fontWeight: 500 })}>
@@ -367,7 +419,7 @@ export default function Home() {
                     <span
                       class={css({
                         display: "flex",
-                        gap: "9px",
+                        gap: "8px",
                         fontSize: "12px",
                         color: "token(colors.inkSoft)",
                       })}
@@ -418,7 +470,7 @@ export default function Home() {
           class={panel}
           style={{
             flex: 1,
-            "min-height": 0,
+            "min-height": "120px",
             "font-size": "13px",
             color: "var(--colors-ink-soft)",
             "overflow-y": "auto",
@@ -431,13 +483,12 @@ export default function Home() {
         </section>
       </aside>
 
-      {/* bottom tray: your hand + actions */}
+      {/* bottom tray: your hand + actions, directly under the board */}
       <section
         class={css({
           display: "flex",
           gap: "14px",
           alignItems: "stretch",
-          padding: "0 14px 14px",
           gridColumn: { lg: "2" },
           flexWrap: "wrap",
         })}
@@ -450,21 +501,23 @@ export default function Home() {
               return (
                 <div
                   class={css({
-                    width: "58px",
+                    width: "60px",
                     borderRadius: "ctrl",
                     background: "token(colors.paper)",
+                    border: "1px solid oklch(0 0 0 / 0.12)",
                     display: "flex",
                     flexDir: "column",
                     alignItems: "center",
                     justifyContent: "center",
-                    gap: "2px",
-                    padding: "8px 0 6px",
-                    boxShadow: "0 3px 10px oklch(0.2 0.08 235 / 0.3)",
+                    gap: "3px",
+                    padding: "6px 0 5px",
+                    boxShadow:
+                      "0 2px 0 oklch(0.25 0.05 60 / 0.25), 0 8px 16px oklch(0.15 0.06 235 / 0.25)",
                   })}
                   style={{ opacity: n() > 0 ? 1 : 0.45 }}
                   title={r}
                 >
-                  <ResourceIcon type={r} size={26} />
+                  <ResourceIcon type={r} size={38} />
                   <span
                     class={css({
                       fontWeight: 900,
@@ -506,28 +559,40 @@ export default function Home() {
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "road" })}
+                disabled={!canAfford("road")}
                 onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
               >
                 <ActionIcon name="road" /> Road
+                <CostDots kind="road" />
               </button>
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "settlement" })}
+                disabled={!canAfford("settlement")}
                 onClick={() =>
                   setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")
                 }
               >
                 <ActionIcon name="settle" /> Settlement
+                <CostDots kind="settlement" />
               </button>
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "city" })}
+                disabled={!canAfford("city")}
                 onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
               >
                 <ActionIcon name="city" /> City
+                <CostDots kind="city" />
               </button>
-              <button type="button" class={btn()} onClick={buyDevCard}>
-                <ActionIcon name="dev" /> Dev
+              <button
+                type="button"
+                class={btn()}
+                disabled={!canAfford("devCard") || (snapshot()?.devCardDeckCount ?? 0) === 0}
+                onClick={buyDevCard}
+              >
+                <ResourceIcon type="dev" size={20} /> Dev
+                <CostDots kind="devCard" />
               </button>
               <button type="button" class={btn()} onClick={() => setTradeOpen(true)}>
                 <ActionIcon name="trade" /> Trade
@@ -657,6 +722,7 @@ function Modal(props: ParentProps) {
         class={css({
           background: "token(colors.paper)",
           borderRadius: "card",
+          border: "1px solid oklch(0 0 0 / 0.12)",
           padding: "20px",
           minW: "320px",
           maxW: "420px",
@@ -690,7 +756,7 @@ function TradeModal() {
               disabled={(me()?.resources[r] ?? 0) < tradeRatio(r)}
               onClick={() => setGive(r)}
             >
-              <ResourceIcon type={r} /> {tradeRatio(r)}:1
+              <ResourceIcon type={r} size={26} /> {tradeRatio(r)}:1
             </button>
           )}
         </For>
@@ -705,7 +771,7 @@ function TradeModal() {
               disabled={r === give()}
               onClick={() => setGet(r)}
             >
-              <ResourceIcon type={r} />
+              <ResourceIcon type={r} size={26} />
             </button>
           )}
         </For>
@@ -764,7 +830,7 @@ function DiscardModal() {
                 background: "token(colors.paperHi)",
               })}
             >
-              <ResourceIcon type={r} size={15} />
+              <ResourceIcon type={r} size={20} />
               <span class={css({ fontSize: "13px" })}>×{me()?.resources[r] ?? 0}</span>
               <button
                 type="button"
@@ -811,7 +877,7 @@ function CardModal(props: { kind: "yearOfPlenty" | "monopoly" }) {
         <For each={RESOURCE_TYPES}>
           {(r) => (
             <button type="button" class={btn({ sel: a() === r })} onClick={() => setA(r)}>
-              <ResourceIcon type={r} /> {r}
+              <ResourceIcon type={r} size={26} /> {r}
             </button>
           )}
         </For>
@@ -824,7 +890,7 @@ function CardModal(props: { kind: "yearOfPlenty" | "monopoly" }) {
           <For each={RESOURCE_TYPES}>
             {(r) => (
               <button type="button" class={btn({ sel: b() === r })} onClick={() => setB(r)}>
-                <ResourceIcon type={r} /> {r}
+                <ResourceIcon type={r} size={26} /> {r}
               </button>
             )}
           </For>

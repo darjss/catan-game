@@ -1,17 +1,24 @@
 // Single source of truth: Panda theme tokens and SVG art both read these.
 export const palette = {
-  table: "oklch(0.62 0.13 233)",
-  tableHi: "oklch(0.68 0.13 228)",
-  water1: "oklch(0.66 0.135 230)",
-  water2: "oklch(0.58 0.13 238)",
+  // Sea: deep marine teal, brighter toward the island.
+  table: "oklch(0.4 0.08 225)",
+  tableHi: "oklch(0.52 0.11 218)",
+  water1: "oklch(0.5 0.1 218)",
+  water2: "oklch(0.38 0.07 230)",
   shore: "oklch(0.87 0.065 90)",
-  paper: "oklch(0.97 0.012 88)",
-  paperHi: "oklch(0.99 0.008 90)",
+  // Timber rails and frames.
+  timber: "oklch(0.44 0.09 62)",
+  timberDark: "oklch(0.34 0.07 60)",
+  timberHi: "oklch(0.55 0.11 68)",
+  // Ivory cardboard controls.
+  paper: "oklch(0.95 0.02 88)",
+  paperHi: "oklch(0.985 0.012 90)",
+  paperDim: "oklch(0.9 0.03 84)",
   ink: "oklch(0.3 0.025 55)",
   inkSoft: "oklch(0.46 0.02 60)",
-  line: "oklch(0.89 0.02 80)",
-  accent: "oklch(0.65 0.17 45)",
-  accentDeep: "oklch(0.56 0.16 42)",
+  line: "oklch(0.85 0.03 80)",
+  accent: "oklch(0.62 0.16 45)",
+  accentDeep: "oklch(0.5 0.15 40)",
   accentInk: "oklch(0.98 0.01 90)",
   danger: "oklch(0.55 0.19 28)",
   gold: "oklch(0.8 0.13 90)",

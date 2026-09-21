@@ -47,7 +47,7 @@ export default function Board(props: {
       viewBox="-5.5 -4.9 11 9.8"
       role="img"
       aria-label="Catan board"
-      style="width:100%;height:auto"
+      style="width:100%;height:100%"
     >
       <defs>
         {/* printed-tile top light */}
@@ -195,7 +195,7 @@ export default function Board(props: {
                 x2={b.x}
                 y2={b.y}
                 stroke={colorOf(e.road!.playerId)}
-                stroke-width="0.17"
+                stroke-width="0.2"
                 stroke-linecap="round"
                 class="piece-in"
               />
@@ -216,14 +216,13 @@ export default function Board(props: {
       {/* legal road spots */}
       <For each={props.snap.edges}>
         {(e) => {
-          if (!props.legal.edges.has(e.id)) return null;
           const [v1, v2] = edgeVertices(e.id);
           const a = vertexPos(v1);
           const b = vertexPos(v2);
           const midX = (a.x + b.x) / 2;
           const midY = (a.y + b.y) / 2;
           return (
-            <g>
+            <Show when={props.legal.edges.has(e.id)}>
               <line
                 x1={a.x}
                 y1={a.y}
@@ -239,7 +238,7 @@ export default function Board(props: {
                 onKeyDown={(ev) => ev.key === "Enter" && props.onEdge(e.id)}
               />
               <TargetRing x={midX} y={midY} r={0.13} />
-            </g>
+            </Show>
           );
         }}
       </For>
