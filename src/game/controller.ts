@@ -34,6 +34,8 @@ export interface LogEntry {
   icon: string;
   actor?: string;
   parts: LogPart[];
+  /** Turn index at push time — the log draws a divider when it changes. */
+  turn?: number;
 }
 const [log, setLog] = createSignal<LogEntry[]>([]);
 const [botThinking, setBotThinking] = createSignal<string | null>(null);
@@ -72,7 +74,8 @@ export function playerName(snap: Snapshot, id: string): string {
 }
 
 function pushEntry(entry: LogEntry) {
-  setLog((l) => [...l.slice(-120), entry]);
+  const turn = snapshot()?.turn.currentPlayerIndex;
+  setLog((l) => [...l.slice(-120), { ...entry, turn }]);
 }
 
 function resParts(r?: Partial<Record<ResourceType, number>>): LogPart[] {

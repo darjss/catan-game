@@ -141,7 +141,7 @@ function LogPartView(props: { part: LogPart }) {
   const p = props.part;
   if (typeof p === "string") return <>{p}</>;
   const inner =
-    "res" in p ? <ResourceIcon type={p.res} size={15} /> : <DieFace value={p.die} size={16} />;
+    "res" in p ? <ResourceIcon type={p.res} size={15} /> : <DieFace value={p.die} size={18} />;
   return (
     <span
       class={css({
@@ -157,6 +157,8 @@ function LogPartView(props: { part: LogPart }) {
 
 export default function Home() {
   let logEl: HTMLElement | undefined;
+  const [helpOpen, setHelpOpen] = createSignal(false);
+  const [logCollapsed, setLogCollapsed] = createSignal(false);
   onSettled(() => {
     newGame();
   });
@@ -242,13 +244,14 @@ export default function Home() {
   return (
     <main
       class={css({
-        height: "100vh",
+        height: { base: "auto", lg: "100vh" },
+        minH: "100vh",
         display: "grid",
-        gridTemplateColumns: { base: "1fr", lg: "52px minmax(0,1fr) 330px" },
+        gridTemplateColumns: { base: "minmax(0,1fr)", lg: "52px minmax(0,1fr) 330px" },
         gridTemplateRows: { base: "auto auto auto auto", lg: "minmax(0,1fr) auto" },
         gap: { base: "8px", lg: "12px" },
         padding: { base: "8px", lg: "12px" },
-        overflow: { base: "auto", lg: "hidden" },
+        overflow: { lg: "hidden" },
       })}
     >
       <Title>Catan</Title>
@@ -279,19 +282,25 @@ export default function Home() {
             stroke-linejoin="round"
           />
         </svg>
-        <button
-          type="button"
-          title="New game"
-          aria-label="New game"
-          class={btn({ kind: "ghost" })}
+        <RailButton
+          icon="reset"
+          label="New game"
           onClick={() => {
             if (snapshot() && !winner() && !confirm("Abandon this game and start a new one?"))
               return;
             newGame();
           }}
-        >
-          ↺
-        </button>
+        />
+        <RailButton
+          icon="expand"
+          label="Toggle fullscreen"
+          onClick={() =>
+            document.fullscreenElement
+              ? document.exitFullscreen()
+              : document.documentElement.requestFullscreen()
+          }
+        />
+        <RailButton icon="help" label="How to play" onClick={() => setHelpOpen(true)} />
       </nav>
 
       {/* board — the page is the sea, the svg is transparent */}
@@ -332,7 +341,7 @@ export default function Home() {
       <aside
         class={css({
           display: "flex",
-          flexDir: "column",
+          flexDir: { base: "column-reverse", lg: "column" },
           gap: "8px",
           minH: 0,
           gridRow: { base: "4", lg: "1 / 3" },
@@ -343,64 +352,161 @@ export default function Home() {
         >
           <div class={railHeader}>
             Game log
-            <span class={css({ color: "token(colors.inkSoft)", fontWeight: 600 })}>▴</span>
+            <button
+              type="button"
+              aria-label={logCollapsed() ? "Expand game log" : "Collapse game log"}
+              title={logCollapsed() ? "Expand game log" : "Collapse game log"}
+              class={css({
+                font: "inherit",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: "token(colors.inkSoft)",
+                display: "grid",
+                placeItems: "center",
+                padding: "2px",
+                borderRadius: "6px",
+                transitionProperty: "transform",
+                transitionDuration: "150ms",
+              })}
+              style={{ transform: logCollapsed() ? "rotate(-90deg)" : "none" }}
+              onClick={() => {
+                setLogCollapsed(!logCollapsed());
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <path d="M6 9 L12 15 L18 9 Z" fill="currentColor" />
+              </svg>
+            </button>
           </div>
           <div
             class={css({
               flex: 1,
               minH: "120px",
+              maxH: { base: "170px", lg: "none" },
               fontSize: "13px",
               color: "token(colors.inkSoft)",
               overflowY: "auto",
               padding: "8px 12px",
             })}
+            style={{ display: logCollapsed() ? "none" : "block" }}
             ref={(el) => {
               logEl = el;
             }}
           >
             <For each={log()}>
-              {(entry) => (
-                <div
-                  class={css({
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: "6px",
-                    padding: "2px 0",
-                    lineHeight: 1.45,
-                  })}
-                >
-                  <span
-                    aria-hidden="true"
-                    class={css({ flexShrink: 0, transform: "translateY(2px)" })}
-                    style={{ color: entry.actor ? PLAYER_DOT[entry.actor] : palette.inkSoft }}
+              {(entry, i) => (
+                <>
+                  <Show when={i() > 0 && entry.turn != null && log()[i() - 1].turn !== entry.turn}>
+                    <div
+                      class={css({
+                        borderTop: "1px solid oklch(0 0 0 / 0.14)",
+                        margin: "5px 0 3px",
+                        paddingTop: "3px",
+                        fontSize: "10px",
+                        fontWeight: 800,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        color: "token(colors.inkSoft)",
+                      })}
+                    >
+                      {entry.turn != null
+                        ? (snapshot()?.players[entry.turn]?.name ?? "Turn")
+                        : "Turn"}
+                    </div>
+                  </Show>
+                  <div
+                    class={css({
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "6px",
+                      padding: "2px 0",
+                      lineHeight: 1.45,
+                    })}
                   >
-                    <LogIcon kind={entry.icon} />
-                  </span>
-                  <span class={css({ flex: 1 })}>
-                    <Show when={entry.actor}>
-                      {(id) => (
-                        <b style={{ color: PLAYER_DOT[id()] ?? palette.ink }}>
-                          {snapshot()?.players.find((p) => p.id === id())?.name ?? "You"}
-                        </b>
-                      )}
-                    </Show>
-                    <For each={entry.parts}>{(part) => <LogPartView part={part} />}</For>
-                  </span>
-                </div>
+                    <span
+                      aria-hidden="true"
+                      class={css({ flexShrink: 0, transform: "translateY(2px)" })}
+                      style={{ color: entry.actor ? PLAYER_DOT[entry.actor] : palette.inkSoft }}
+                    >
+                      <LogIcon kind={entry.icon} />
+                    </span>
+                    <span class={css({ flex: 1 })}>
+                      <Show when={entry.actor}>
+                        {(id) => (
+                          <b style={{ color: PLAYER_DOT[id()] ?? palette.ink }}>
+                            {snapshot()?.players.find((p) => p.id === id())?.name ?? "You"}
+                          </b>
+                        )}
+                      </Show>
+                      <For each={entry.parts}>{(part) => <LogPartView part={part} />}</For>
+                    </span>
+                  </div>
+                </>
               )}
             </For>
           </div>
         </section>
 
+        {/* bank strip — real state only: dev deck, road/army holders */}
+        <section
+          class={`${panel} ${css({
+            display: "flex",
+            gap: "12px",
+            padding: "5px 12px",
+            fontSize: "11px",
+            fontWeight: 700,
+            color: "token(colors.inkSoft)",
+            alignItems: "center",
+            overflowX: "auto",
+            flexShrink: 0,
+          })}`}
+        >
+          <span
+            class={css({ display: "inline-flex", alignItems: "center", gap: "4px" })}
+            title="Development cards left in the deck"
+          >
+            <ActionIcon name="dev" size={14} />
+            Deck ×{snapshot()?.devCardDeckCount ?? 0}
+          </span>
+          <span
+            class={css({ display: "inline-flex", alignItems: "center", gap: "4px" })}
+            title="Longest road"
+          >
+            <ActionIcon name="road" size={14} />
+            {snapshot()?.longestRoadPlayer
+              ? (snapshot()?.players.find((p) => p.id === snapshot()?.longestRoadPlayer)?.name ??
+                "—")
+              : "Road —"}
+          </span>
+          <span
+            class={css({ display: "inline-flex", alignItems: "center", gap: "4px" })}
+            title="Largest army"
+          >
+            <ActionIcon name="knight" size={14} />
+            {snapshot()?.largestArmyPlayer
+              ? (snapshot()?.players.find((p) => p.id === snapshot()?.largestArmyPlayer)?.name ??
+                "—")
+              : "Army —"}
+          </span>
+        </section>
+
         {/* player cards */}
-        <section class={css({ display: "flex", flexDir: "column", gap: "6px" })}>
+        <section
+          class={css({
+            display: "flex",
+            flexDir: { base: "row", lg: "column" },
+            gap: "6px",
+            overflowX: { base: "auto", lg: "visible" },
+          })}
+        >
           <For each={snapshot()?.players}>
             {(p) => {
               const active = () => current()?.id === p.id;
               const thinking = () => botThinking() === p.name;
               return (
                 <div
-                  class={panel}
+                  class={`${panel} ${css({ minW: { base: "190px", lg: "0px" } })}`}
                   style={{
                     display: "flex",
                     "align-items": "center",
@@ -444,27 +550,44 @@ export default function Home() {
                     <span
                       class={css({
                         display: "flex",
-                        gap: "9px",
+                        gap: "10px",
                         fontSize: "12px",
+                        fontWeight: 700,
                         color: "token(colors.inkSoft)",
                         alignItems: "center",
                       })}
                     >
-                      <span title="cards in hand">{handSizeOf(p)} cards</span>
+                      <Stat icon="cards" n={handSizeOf(p)} title="cards in hand" />
+                      <Stat icon="road" n={p.roads.length} title="roads" />
+                      <Stat
+                        icon="settle"
+                        n={p.settlements.length + p.cities.length}
+                        title="settlements + cities"
+                      />
                       <Show when={p.devCards.filter((c) => !c.playedThisTurn).length > 0}>
-                        <span title="development cards">
-                          {p.devCards.filter((c) => !c.playedThisTurn).length} dev
-                        </span>
+                        <Stat
+                          icon="dev"
+                          n={p.devCards.filter((c) => !c.playedThisTurn).length}
+                          title="development cards"
+                        />
                       </Show>
-                      <span title="roads">{p.roads.length} roads</span>
+                      <Show when={p.knightsPlayed > 0}>
+                        <Stat icon="knight" n={p.knightsPlayed} title="knights played" />
+                      </Show>
                       <Show when={p.hasLongestRoad}>
-                        <span class={css({ color: "token(colors.accent)", fontWeight: 700 })}>
-                          longest
+                        <span
+                          class={css({ color: "token(colors.accent)", fontWeight: 800 })}
+                          title="Longest road"
+                        >
+                          LR
                         </span>
                       </Show>
                       <Show when={p.hasLargestArmy}>
-                        <span class={css({ color: "token(colors.accent)", fontWeight: 700 })}>
-                          army
+                        <span
+                          class={css({ color: "token(colors.accent)", fontWeight: 800 })}
+                          title="Largest army"
+                        >
+                          LA
                         </span>
                       </Show>
                     </span>
@@ -500,12 +623,13 @@ export default function Home() {
           display: "flex",
           gap: "10px",
           alignItems: "center",
-          flexWrap: { base: "wrap", lg: "nowrap" },
-          justifyContent: { base: "center", lg: "flex-start" },
+          flexWrap: "nowrap",
+          overflowX: { base: "auto", lg: "visible" },
+          justifyContent: { base: "flex-start", lg: "flex-start" },
           gridColumn: { lg: "2" },
           gridRow: { base: "3", lg: "2" },
           padding: "8px 14px",
-          minH: "86px",
+          minH: { base: "104px", lg: "110px" },
         })}`}
       >
         {/* hand of resource cards */}
@@ -584,25 +708,25 @@ export default function Home() {
         {/* center: status + dice (or trade composition) */}
         <div
           class={css({
-            flex: 1,
+            flexGrow: 1,
+            flexShrink: 0,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "14px",
-            minW: 0,
           })}
         >
           <Show when={!tradeOpen()} fallback={<TradeDock />}>
             <span
               class={css({
-                width: "30px",
-                height: "30px",
+                width: "34px",
+                height: "34px",
                 borderRadius: "full",
                 flexShrink: 0,
                 display: "grid",
                 placeItems: "center",
                 fontWeight: 900,
-                fontSize: "14px",
+                fontSize: "16px",
                 color: "token(colors.accentInk)",
                 boxShadow: "inset 0 -2px 0 oklch(0 0 0 / 0.2), 0 0 0 2px oklch(0 0 0 / 0.12)",
               })}
@@ -610,7 +734,14 @@ export default function Home() {
             >
               {current()?.name.slice(0, 1)}
             </span>
-            <span class={css({ minW: "110px", maxW: "240px", textAlign: "center" })}>
+            <span
+              class={css({
+                minW: "140px",
+                maxW: "260px",
+                flexShrink: 1,
+                textAlign: "center",
+              })}
+            >
               <span class={css({ display: "block", fontWeight: 900, fontSize: "15px" })}>
                 {myTurn() ? "Your turn" : `${current()?.name ?? "…"}'s turn`}
                 <Show when={botThinking()}>
@@ -637,12 +768,23 @@ export default function Home() {
                 {prompt()}
               </span>
             </span>
-            <span data-dice class={css({ display: "flex", gap: "8px", flexShrink: 0 })}>
-              <Show when={snapshot()?.turn.diceRoll}>
+            <span
+              data-dice
+              class={css({ display: "flex", gap: "10px", flexShrink: 0, alignItems: "center" })}
+            >
+              <Show
+                when={snapshot()?.turn.diceRoll}
+                fallback={
+                  <span class={css({ display: "flex", gap: "10px", opacity: 0.3 })}>
+                    <DieFace value={1} size={72} />
+                    <DieFace value={1} size={72} />
+                  </span>
+                }
+              >
                 {(d) => (
                   <>
-                    <DieFace value={d()[0]} size={44} />
-                    <DieFace value={d()[1]} size={44} />
+                    <DieFace value={d()[0]} size={72} />
+                    <DieFace value={d()[1]} size={72} />
                   </>
                 )}
               </Show>
@@ -672,6 +814,7 @@ export default function Home() {
           <ActionTile
             icon="trade"
             label="Trade with the bank"
+            short="Trade"
             sel={tradeOpen()}
             disabled={!(myTurn() && phase() === "main" && rolled())}
             onClick={() => setTradeOpen(!tradeOpen())}
@@ -679,12 +822,14 @@ export default function Home() {
           <ActionTile
             icon="dev"
             label={`Buy development card — ${costText("devCard")}`}
+            short="Dev"
             disabled={!canBuyDevNow()}
             onClick={buyDevCard}
           />
           <ActionTile
             icon="road"
             label={`Build road — ${costText("road")}`}
+            short="Road"
             badge={15 - (me()?.roads.length ?? 0)}
             sel={pendingBuild() === "road"}
             disabled={!canPlaceNow("road")}
@@ -693,6 +838,7 @@ export default function Home() {
           <ActionTile
             icon="settle"
             label={`Build settlement — ${costText("settlement")}`}
+            short="Settle"
             badge={5 - (me()?.settlements.length ?? 0)}
             sel={pendingBuild() === "settlement"}
             disabled={!canPlaceNow("settlement")}
@@ -701,6 +847,7 @@ export default function Home() {
           <ActionTile
             icon="city"
             label={`Upgrade to city — ${costText("city")}`}
+            short="City"
             badge={4 - (me()?.cities.length ?? 0)}
             sel={pendingBuild() === "city"}
             disabled={!canPlaceNow("city")}
@@ -709,6 +856,7 @@ export default function Home() {
           <ActionTile
             icon="end"
             label="End turn"
+            short="End"
             accent
             disabled={!(myTurn() && phase() === "main" && rolled())}
             onClick={endTurn}
@@ -752,6 +900,27 @@ export default function Home() {
       </Show>
       <Show when={cardPick()}>{(kind) => <CardModal kind={kind()} />}</Show>
 
+      <Show when={helpOpen()}>
+        <Modal>
+          <h2 class={modalTitle}>How to play</h2>
+          <div class={css({ fontSize: "13px", lineHeight: 1.5, color: "token(colors.inkSoft)" })}>
+            <p>
+              First to {GAME_CONSTANTS.VICTORY_POINTS_TO_WIN} victory points wins. Roll dice to
+              collect resources, then build roads, settlements, and cities or buy development cards.
+            </p>
+            <ul class={css({ paddingLeft: "18px", margin: "6px 0" })}>
+              <li>Settlements and cities earn resources when their hex's number is rolled.</li>
+              <li>A roll of 7 moves the robber — players over 7 cards discard half.</li>
+              <li>Trade spare resources with the bank (4:1, or better at ports).</li>
+              <li>Longest road and largest army are each worth 2 VP.</li>
+            </ul>
+          </div>
+          <button type="button" class={btn({ kind: "primary" })} onClick={() => setHelpOpen(false)}>
+            Got it
+          </button>
+        </Modal>
+      </Show>
+
       <Show when={winner()}>
         {(w) => (
           <Modal>
@@ -789,10 +958,41 @@ export default function Home() {
   );
 }
 
-/** Square action tile like the reference dock — icon, count badge, tooltip. */
+/** Slim icon button for the left rail. */
+function RailButton(p: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      title={p.label}
+      aria-label={p.label}
+      onClick={p.onClick}
+      class={css({
+        width: "38px",
+        height: "38px",
+        padding: "0",
+        borderRadius: "12px",
+        display: "grid",
+        placeItems: "center",
+        cursor: "pointer",
+        border: "1px solid oklch(1 0 0 / 0.22)",
+        background: "oklch(1 0 0 / 0.12)",
+        color: "token(colors.paper)",
+        transitionProperty: "transform, background-color",
+        transitionDuration: "150ms",
+        _hover: { background: "oklch(1 0 0 / 0.22)" },
+        _active: { transform: "scale(0.94)" },
+      })}
+    >
+      <ActionIcon name={p.icon} size={20} />
+    </button>
+  );
+}
+
+/** Square action tile — icon, tiny caption, count badge, tooltip. */
 function ActionTile(props: {
   icon: string;
   label: string;
+  short?: string;
   badge?: number;
   sel?: boolean;
   accent?: boolean;
@@ -808,33 +1008,52 @@ function ActionTile(props: {
       onClick={props.onClick}
       class={css({
         position: "relative",
-        width: "52px",
-        height: "52px",
+        width: "54px",
+        height: "58px",
         borderRadius: "ctrl",
-        display: "grid",
-        placeItems: "center",
+        display: "flex",
+        flexDir: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "1px",
         cursor: "pointer",
-        fontSize: "22px",
-        border: "1px solid oklch(0 0 0 / 0.18)",
+        border: "1px solid oklch(0 0 0 / 0.22)",
         transitionProperty: "transform, background-color, box-shadow",
         transitionDuration: "150ms",
         transitionTimingFunction: "token(easings.out)",
         _active: { transform: "translateY(1px) scale(0.95)" },
-        _disabled: { opacity: 0.35, cursor: "default" },
+        _disabled: {
+          opacity: 0.4,
+          cursor: "default",
+          filter: "grayscale(0.7)",
+          boxShadow: "none",
+        },
       })}
       style={{
         background: props.accent
           ? "var(--colors-accent)"
           : props.sel
             ? "var(--colors-paper)"
-            : "oklch(0.7 0.08 90 / 0.4)",
+            : "oklch(0.94 0.025 88 / 0.9)",
         color: props.accent ? "var(--colors-accent-ink)" : "var(--colors-ink)",
         "box-shadow": props.sel
           ? "0 0 0 2px var(--colors-accent)"
-          : "0 2px 0 oklch(0.25 0.05 60 / 0.2)",
+          : "0 2px 0 oklch(0.25 0.05 60 / 0.25)",
       }}
     >
       <ActionIcon name={props.icon} size={24} />
+      <span
+        class={css({
+          fontSize: "9px",
+          fontWeight: 800,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+          lineHeight: 1,
+          opacity: 0.75,
+        })}
+      >
+        {props.short ?? props.label.split(" ")[0]}
+      </span>
       <Show when={props.badge != null}>
         <span
           class={css({
@@ -857,6 +1076,19 @@ function ActionTile(props: {
         </span>
       </Show>
     </button>
+  );
+}
+
+/** Icon + number stat for player cards. */
+function Stat(props: { icon: string; n: number; title: string }) {
+  return (
+    <span
+      title={props.title}
+      class={css({ display: "inline-flex", alignItems: "center", gap: "3px" })}
+    >
+      <ActionIcon name={props.icon} size={14} />
+      {props.n}
+    </span>
   );
 }
 

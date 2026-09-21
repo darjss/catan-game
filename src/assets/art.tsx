@@ -215,19 +215,24 @@ export function PortBadge(p: { x: number; y: number; ratio: number; angle: numbe
   );
 }
 
-/** Legal-move affordance: a breathing ring over a small seat dot. */
+/** Legal-move affordance: a pulsing accent ring over a solid target dot —
+ *  must read on any terrain and on touch screens where no hover exists. */
 export function TargetRing(p: { x: number; y: number; r?: number }) {
   const r = p.r ?? 0.16;
   return (
     <g transform={`translate(${p.x} ${p.y})`} style="pointer-events:none">
+      {/* expanding pulse */}
       <circle
         r={r}
         fill="none"
-        stroke={palette.accentInk}
-        stroke-width="0.045"
-        style="animation: ping-soft 1.4s cubic-bezier(0.23,1,0.32,1) infinite; transform-box: fill-box; transform-origin: center;"
+        stroke={palette.accent}
+        stroke-width="0.06"
+        style="animation: ping-soft 1.3s cubic-bezier(0.23,1,0.32,1) infinite; transform-box: fill-box; transform-origin: center;"
       />
-      <circle r={r * 0.45} fill={palette.accentInk} opacity="0.95" />
+      {/* static ring */}
+      <circle r={r} fill="none" stroke={palette.accent} stroke-width="0.045" opacity="0.9" />
+      {/* solid target dot, white core for contrast on dark terrain */}
+      <circle r={r * 0.52} fill={palette.accent} stroke={palette.accentInk} stroke-width="0.028" />
     </g>
   );
 }
@@ -311,6 +316,19 @@ export function ActionIcon(p: { name: string; size?: number }) {
       {p.name === "end" && <path d="M5 21 V4 h1.8 v17 Z M7.5 4 h11.8 l-3.2 4.2 3.2 4.2 H7.5 Z" />}
       {p.name === "cancel" && (
         <path d="M6.2 4.5 L12 10.3 17.8 4.5 19.5 6.2 13.7 12 19.5 17.8 17.8 19.5 12 13.7 6.2 19.5 4.5 17.8 10.3 12 4.5 6.2 Z" />
+      )}
+      {p.name === "reset" && (
+        <path d="M12 4 a8 8 0 1 1 -7.7 5.7 l-1.8 .9 L5.6 5.4 l5.4 3.1 -1.9 .9 A5.6 5.6 0 1 0 12 6.4 Z" />
+      )}
+      {p.name === "expand" && (
+        <path d="M4 4 h5.5 v2.4 H7.4 l3.3 3.3 -1.7 1.7 -3.3 -3.3 v2.1 H4 Z M20 20 h-5.5 v-2.4 h2.1 l-3.3 -3.3 1.7 -1.7 3.3 3.3 v-2.1 H20 Z" />
+      )}
+      {p.name === "help" && (
+        <path d="M12 3 a9 9 0 1 0 0 18 a9 9 0 0 0 0 -18 Z m0 4.2 a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0 -3 Z m-1.1 4.4 h2.2 v5.6 h-2.2 Z" />
+      )}
+      {p.name === "cards" && <rect x="5" y="6" width="14" height="14" rx="2" />}
+      {p.name === "knight" && (
+        <path d="M17 3 L21 7 L12.5 15.5 L15.5 18.5 L14 20 L9.5 15.5 L7 18 L6 17 L8.5 14.5 L4 10 L5.5 8.5 L8.5 11.5 Z" />
       )}
     </svg>
   );

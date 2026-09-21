@@ -126,10 +126,10 @@ export default function Board(props: {
                 <polygon
                   points={hexPointsR(c(), 1)}
                   fill="oklch(1 0 0 / 0.12)"
-                  stroke="oklch(0.85 0.15 80)"
-                  stroke-width="0.07"
+                  stroke={palette.accent}
+                  stroke-width="0.1"
                   stroke-linejoin="round"
-                  style="cursor:pointer"
+                  style="animation: hex-target-pulse 1.2s ease-in-out infinite; cursor:pointer"
                   role="button"
                   tabindex="0"
                   aria-label={`Move robber to ${tileDesc(t.id)}`}

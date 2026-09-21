@@ -34,6 +34,17 @@
   }
 }
 
+/* Robber-target hexes pulse their accent ring. */
+@keyframes hex-target-pulse {
+  0%,
+  100% {
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-opacity: 0.35;
+  }
+}
+
 @keyframes modal-in {
   from {
     transform: scale(0.96);
