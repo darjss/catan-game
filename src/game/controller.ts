@@ -35,6 +35,8 @@ const [robberPick, setRobberPick] = createSignal<{ hexId: string; targets: Playe
 const [tradeOpen, setTradeOpen] = createSignal(false);
 const [cardPick, setCardPick] = createSignal<"yearOfPlenty" | "monopoly" | null>(null);
 const [lastError, setLastError] = createSignal<string | null>(null);
+/** Hexes that produced on the latest roll — for the board flash. */
+const [producedTiles, setProducedTiles] = createSignal<Set<string>>(new Set());
 
 export {
   snapshot,
@@ -49,6 +51,7 @@ export {
   setCardPick,
   lastError,
   setLastError,
+  producedTiles,
 };
 
 export function isBot(id: string): boolean {
@@ -106,13 +109,44 @@ function describeEvent(snap: Snapshot, ev: GameEvent): string | null {
   }
 }
 
+let flashToken = 0;
+
 function refresh() {
   if (!game) return;
   const snap = takeSnapshot(game.getState());
   setSnapshot(snap);
   for (const ev of game.getHistory().slice(seenEvents)) {
+    if (ev.type === "diceRolled" && ev.total !== 7) {
+      const produced = new Set(
+        snap.tiles.filter((t) => t.numberToken === ev.total && !t.hasRobber).map((t) => t.id),
+      );
+      const token = ++flashToken;
+      setProducedTiles(produced);
+      setTimeout(() => {
+        if (flashToken === token) setProducedTiles(new Set<string>());
+      }, 1400);
+    }
     const line = describeEvent(snap, ev);
     if (line) pushLog(line);
+    // The engine doesn't emit per-player gain events — derive them from the
+    // board: 1 card per settlement, 2 per city on each producing hex.
+    if (ev.type === "diceRolled" && ev.total !== 7) {
+      const gains = new Map<string, Map<string, number>>();
+      for (const t of snap.tiles) {
+        if (t.numberToken !== ev.total || t.hasRobber) continue;
+        for (const v of snap.vertices) {
+          if (!v.structure || !v.adjacentTiles.includes(t.id)) continue;
+          const n = v.structure.type === "city" ? 2 : 1;
+          const m = gains.get(v.structure.playerId) ?? new Map<string, number>();
+          m.set(t.type, (m.get(t.type) ?? 0) + n);
+          gains.set(v.structure.playerId, m);
+        }
+      }
+      for (const [pid, res] of gains) {
+        const text = [...res].map(([r, n]) => `${n} ${r}`).join(", ");
+        pushLog(`${playerName(snap, pid)} gained ${text}`);
+      }
+    }
   }
   seenEvents = game.getHistory().length;
 }

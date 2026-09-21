@@ -36,11 +36,25 @@ function hexPointsR(center: { x: number; y: number }, r: number): string {
 export default function Board(props: {
   snap: Snapshot;
   legal: LegalTargets;
+  producing: Set<string>;
+  ghost: "settlement" | "city";
   onVertex: (id: string) => void;
   onEdge: (id: string) => void;
   onTile: (id: string) => void;
 }) {
   const colorOf = (id: string) => PLAYER_COLOR[id] ?? palette.ink;
+  const myColor = () => colorOf(props.snap.players[props.snap.turn.currentPlayerIndex].id);
+  const tileDesc = (id: string) => {
+    const t = props.snap.tiles.find((x) => x.id === id);
+    return t ? (t.type === "desert" ? "desert" : `${t.numberToken} ${t.type}`) : "?";
+  };
+  const vertexDesc = (v: { adjacentTiles: string[] }) => {
+    const ts = v.adjacentTiles
+      .map(tileDesc)
+      .filter((d) => d !== "desert")
+      .join(", ");
+    return ts || "coast";
+  };
 
   return (
     <svg
@@ -102,14 +116,23 @@ export default function Board(props: {
                 <TileArt type={t.type} seed={t.id} />
               </g>
               <polygon points={hexPointsR(c(), 1)} fill="url(#tilelight)" />
+              <Show when={props.producing.has(t.id)}>
+                <polygon points={hexPointsR(c(), 1)} class="hex-flash" />
+              </Show>
+              <Show when={props.legal.tiles.size > 0 && !props.legal.tiles.has(t.id)}>
+                <polygon points={hexPointsR(c(), 1)} fill="oklch(0 0 0 / 0.3)" />
+              </Show>
               <Show when={props.legal.tiles.has(t.id)}>
                 <polygon
                   points={hexPointsR(c(), 1)}
-                  fill="oklch(1 0 0 / 0.22)"
+                  fill="oklch(1 0 0 / 0.12)"
+                  stroke="oklch(0.85 0.15 80)"
+                  stroke-width="0.07"
+                  stroke-linejoin="round"
                   style="cursor:pointer"
                   role="button"
                   tabindex="0"
-                  aria-label={`Move robber to ${t.type}`}
+                  aria-label={`Move robber to ${tileDesc(t.id)}`}
                   onClick={() => props.onTile(t.id)}
                   onKeyDown={(e) => e.key === "Enter" && props.onTile(t.id)}
                 />
@@ -178,7 +201,24 @@ export default function Board(props: {
               ang: ang + 90,
             };
           };
-          return <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} angle={pos().ang} />;
+          return (
+            <g>
+              <For each={p.vertices.map(legacyVertexPos)}>
+                {(v) => (
+                  <line
+                    x1={v.x}
+                    y1={v.y}
+                    x2={pos().x}
+                    y2={pos().y}
+                    stroke="oklch(0.9 0.05 85 / 0.5)"
+                    stroke-width="0.03"
+                    stroke-dasharray="0.08 0.06"
+                  />
+                )}
+              </For>
+              <PortBadge x={pos().x} y={pos().y} ratio={p.ratio} angle={pos().ang} />
+            </g>
+          );
         }}
       </For>
 
@@ -224,21 +264,33 @@ export default function Board(props: {
           const midY = (a.y + b.y) / 2;
           return (
             <Show when={props.legal.edges.has(e.id)}>
-              <line
-                x1={a.x}
-                y1={a.y}
-                x2={b.x}
-                y2={b.y}
-                stroke="transparent"
-                stroke-width="0.4"
-                style="cursor:pointer"
-                role="button"
-                tabindex="0"
-                aria-label={`Build road ${e.id}`}
-                onClick={() => props.onEdge(e.id)}
-                onKeyDown={(ev) => ev.key === "Enter" && props.onEdge(e.id)}
-              />
-              <TargetRing x={midX} y={midY} r={0.13} />
+              <g class="target-spot">
+                <line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke="transparent"
+                  stroke-width="0.55"
+                  style="cursor:pointer"
+                  role="button"
+                  tabindex="0"
+                  aria-label={`Road along ${vertexDesc({ adjacentTiles: e.adjacentTiles })}`}
+                  onClick={() => props.onEdge(e.id)}
+                  onKeyDown={(ev) => ev.key === "Enter" && props.onEdge(e.id)}
+                />
+                <line
+                  class="ghost"
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke={myColor()}
+                  stroke-width="0.2"
+                  stroke-linecap="round"
+                />
+                <TargetRing x={midX} y={midY} r={0.13} />
+              </g>
             </Show>
           );
         }}
@@ -261,19 +313,29 @@ export default function Board(props: {
                 </g>
               </Show>
               <Show when={props.legal.vertices.has(v.id)}>
-                <circle
-                  cx={p.x}
-                  cy={p.y}
-                  r="0.3"
-                  fill="transparent"
-                  style="cursor:pointer"
-                  role="button"
-                  tabindex="0"
-                  aria-label={`Build at ${v.id}`}
-                  onClick={() => props.onVertex(v.id)}
-                  onKeyDown={(e) => e.key === "Enter" && props.onVertex(v.id)}
-                />
-                <TargetRing x={p.x} y={p.y} r={0.15} />
+                <g class="target-spot">
+                  <circle
+                    cx={p.x}
+                    cy={p.y}
+                    r="0.5"
+                    fill="transparent"
+                    style="cursor:pointer"
+                    role="button"
+                    tabindex="0"
+                    aria-label={`Settlement spot touching ${vertexDesc(v)}`}
+                    onClick={() => props.onVertex(v.id)}
+                    onKeyDown={(e) => e.key === "Enter" && props.onVertex(v.id)}
+                  />
+                  <g class="ghost">
+                    <Show
+                      when={props.ghost === "city"}
+                      fallback={<Settlement x={p.x} y={p.y} color={myColor()} />}
+                    >
+                      <City x={p.x} y={p.y} color={myColor()} />
+                    </Show>
+                  </g>
+                  <TargetRing x={p.x} y={p.y} r={0.15} />
+                </g>
               </Show>
             </g>
           );

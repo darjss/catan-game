@@ -60,6 +60,37 @@
   transform-box: fill-box;
   transform-origin: center bottom;
   animation: piece-in 320ms cubic-bezier(0.23, 1, 0.32, 1);
+  filter: drop-shadow(0 0.06px 0.1px oklch(0 0 0 / 0.45));
+}
+
+/* A producing hex flashes warm gold for a beat after the roll. */
+@keyframes hex-flash {
+  0% {
+    fill: oklch(0.92 0.16 95 / 0);
+  }
+  25% {
+    fill: oklch(0.92 0.16 95 / 0.5);
+  }
+  100% {
+    fill: oklch(0.92 0.16 95 / 0);
+  }
+}
+
+.hex-flash {
+  animation: hex-flash 1.3s ease-out;
+  pointer-events: none;
+}
+
+/* Ghost preview of the piece under a legal build target. */
+.target-spot .ghost {
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+  pointer-events: none;
+}
+
+.target-spot:hover .ghost,
+.target-spot:focus-within .ghost {
+  opacity: 0.55;
 }
 
 /* Dice tumble into the tray. */

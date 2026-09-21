@@ -29,6 +29,7 @@ import {
   newGame,
   pendingBuild,
   pickMonopoly,
+  producedTiles,
   pickRobberTarget,
   pickYearOfPlenty,
   playCard,
@@ -114,26 +115,42 @@ const btn = cva({
 
 const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
 
-/** Cost as little resource chips: painted icon + ×n when more than one. */
-function Cost(props: { kind: BuildKind }) {
+/** Cost as little resource chips: painted icon + ×n when more than one.
+ *  Resources the player can't cover get a red ring so the blocker reads
+ *  at a glance — no tooltip needed. */
+function Cost(props: { kind: BuildKind; have?: Partial<Record<ResourceType, number>> }) {
   return (
     <span
       class={css({ display: "inline-flex", gap: "3px", alignItems: "center", marginLeft: "4px" })}
     >
       <For each={RESOURCE_TYPES.filter((r) => (GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 0)}>
-        {(r) => (
-          <span
-            class={css({ display: "inline-flex", alignItems: "center" })}
-            title={`${GAME_CONSTANTS.COSTS[props.kind][r]} ${r}`}
-          >
-            <ResourceIcon type={r} size={15} />
-            <Show when={(GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 1}>
-              <b class={css({ fontSize: "10px", marginLeft: "1px" })}>
-                ×{GAME_CONSTANTS.COSTS[props.kind][r]}
-              </b>
-            </Show>
-          </span>
-        )}
+        {(r) => {
+          const missing = () =>
+            props.have != null && (props.have[r] ?? 0) < (GAME_CONSTANTS.COSTS[props.kind][r] ?? 0);
+          return (
+            <span
+              class={css({
+                display: "inline-flex",
+                alignItems: "center",
+                borderRadius: "full",
+                boxShadow: "0 0 0 2px transparent",
+              })}
+              style={{
+                "box-shadow": missing()
+                  ? "0 0 0 2px var(--colors-danger)"
+                  : "0 0 0 2px transparent",
+              }}
+              title={missing() ? `Missing ${r}` : `${GAME_CONSTANTS.COSTS[props.kind][r]} ${r}`}
+            >
+              <ResourceIcon type={r} size={15} />
+              <Show when={(GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 1}>
+                <b class={css({ fontSize: "10px", marginLeft: "1px" })}>
+                  ×{GAME_CONSTANTS.COSTS[props.kind][r]}
+                </b>
+              </Show>
+            </span>
+          );
+        }}
       </For>
     </span>
   );
@@ -146,9 +163,17 @@ function costText(kind: BuildKind) {
 }
 
 export default function Home() {
+  let logEl: HTMLElement | undefined;
   onSettled(() => {
     newGame();
   });
+  // Keep the activity log pinned to the newest line.
+  createEffect(
+    () => log().length,
+    () => {
+      logEl?.scrollTo({ top: logEl.scrollHeight });
+    },
+  );
 
   const me = () => snapshot()?.players.find((p) => p.id === HUMAN_ID);
   const current = () => {
@@ -271,7 +296,11 @@ export default function Home() {
           title="New game"
           aria-label="New game"
           class={btn({ kind: "ghost" })}
-          onClick={() => newGame()}
+          onClick={() => {
+            if (snapshot() && !winner() && !confirm("Abandon this game and start a new one?"))
+              return;
+            newGame();
+          }}
         >
           ↺
         </button>
@@ -301,6 +330,8 @@ export default function Home() {
             <Board
               snap={s()}
               legal={legal()}
+              producing={producedTiles()}
+              ghost={pendingBuild() === "city" ? "city" : "settlement"}
               onVertex={clickVertex}
               onEdge={clickEdge}
               onTile={clickTile}
@@ -425,8 +456,11 @@ export default function Home() {
             color: "var(--colors-ink-soft)",
             "overflow-y": "auto",
             display: "flex",
-            "flex-direction": "column-reverse",
+            "flex-direction": "column",
             padding: "10px 14px",
+          }}
+          ref={(el) => {
+            logEl = el;
           }}
         >
           <For each={log()}>{(line) => <div class={css({ padding: "2px 0" })}>{line}</div>}</For>
@@ -585,7 +619,7 @@ export default function Home() {
                 onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
               >
                 <ActionIcon name="road" /> Road
-                <Cost kind="road" />
+                <Cost kind="road" have={me()?.resources} />
               </button>
               <button
                 type="button"
@@ -597,7 +631,7 @@ export default function Home() {
                 }
               >
                 <ActionIcon name="settle" /> Settlement
-                <Cost kind="settlement" />
+                <Cost kind="settlement" have={me()?.resources} />
               </button>
               <button
                 type="button"
@@ -607,7 +641,7 @@ export default function Home() {
                 onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
               >
                 <ActionIcon name="city" /> City
-                <Cost kind="city" />
+                <Cost kind="city" have={me()?.resources} />
               </button>
               <button
                 type="button"
@@ -617,7 +651,7 @@ export default function Home() {
                 onClick={buyDevCard}
               >
                 <ResourceIcon type="dev" size={20} /> Dev
-                <Cost kind="devCard" />
+                <Cost kind="devCard" have={me()?.resources} />
               </button>
               <button type="button" class={btn()} onClick={() => setTradeOpen(true)}>
                 <ActionIcon name="trade" /> Trade
