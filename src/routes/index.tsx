@@ -15,6 +15,8 @@ import {
   HUMAN_ID,
   botThinking,
   buyDevCard,
+  canBuyDevNow,
+  canPlaceNow,
   cardPick,
   clickEdge,
   clickTile,
@@ -41,7 +43,7 @@ import {
   tradeRatio,
 } from "../game/controller";
 import { RESOURCE_TYPES, type ResourceType } from "../game/model";
-import { ActionIcon, DieFace, ResourceIcon, TERRAIN_BASE } from "../assets/art";
+import { ActionIcon, DieFace, ResourceIcon } from "../assets/art";
 import { palette } from "../palette";
 
 const CARD_NAMES: Record<string, string> = {
@@ -112,31 +114,35 @@ const btn = cva({
 
 const modalTitle = css({ margin: 0, fontSize: "19px", fontWeight: 800 });
 
-/** One small painted dot per unit of cost — readable at a glance. */
-function CostDots(props: { kind: BuildKind }) {
+/** Cost as little resource chips: painted icon + ×n when more than one. */
+function Cost(props: { kind: BuildKind }) {
   return (
     <span
-      class={css({ display: "inline-flex", gap: "3px", alignItems: "center", marginLeft: "2px" })}
+      class={css({ display: "inline-flex", gap: "3px", alignItems: "center", marginLeft: "4px" })}
     >
-      <For each={RESOURCE_TYPES}>
+      <For each={RESOURCE_TYPES.filter((r) => (GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 0)}>
         {(r) => (
-          <For each={Array.from({ length: GAME_CONSTANTS.COSTS[props.kind][r] ?? 0 })}>
-            {() => (
-              <span
-                class={css({
-                  width: "9px",
-                  height: "9px",
-                  borderRadius: "3px",
-                  boxShadow: "inset 0 0 0 1px oklch(0 0 0 / 0.25)",
-                })}
-                style={{ background: TERRAIN_BASE[r] }}
-              />
-            )}
-          </For>
+          <span
+            class={css({ display: "inline-flex", alignItems: "center" })}
+            title={`${GAME_CONSTANTS.COSTS[props.kind][r]} ${r}`}
+          >
+            <ResourceIcon type={r} size={15} />
+            <Show when={(GAME_CONSTANTS.COSTS[props.kind][r] ?? 0) > 1}>
+              <b class={css({ fontSize: "10px", marginLeft: "1px" })}>
+                ×{GAME_CONSTANTS.COSTS[props.kind][r]}
+              </b>
+            </Show>
+          </span>
         )}
       </For>
     </span>
   );
+}
+
+function costText(kind: BuildKind) {
+  return RESOURCE_TYPES.filter((r) => (GAME_CONSTANTS.COSTS[kind][r] ?? 0) > 0)
+    .map((r) => `${GAME_CONSTANTS.COSTS[kind][r]} ${r}`)
+    .join(" + ");
 }
 
 export default function Home() {
@@ -199,8 +205,8 @@ export default function Home() {
     if (s.turn.phase === "setup") {
       return myTurn()
         ? s.turn.setupPhase?.includes("Settlement")
-          ? "Place a settlement"
-          : "Place a road"
+          ? "Place a settlement — tap a glowing spot"
+          : "Place a road — tap a glowing edge"
         : `${current()?.name} is setting up…`;
     }
     if (s.turn.phase === "robberDiscard") {
@@ -211,7 +217,7 @@ export default function Home() {
     }
     if (!myTurn())
       return botThinking() ? `${botThinking()} is thinking…` : `${current()?.name}'s turn`;
-    if (!rolled()) return "Your turn — roll the dice";
+    if (!rolled()) return "Roll the dice";
     const pb = pendingBuild();
     if (pb === "knight") return "Knight: tap a hex for the robber";
     if (pb === "roadBuilding1") return "Road Building: tap an edge for road 1";
@@ -276,49 +282,13 @@ export default function Home() {
         class={css({
           position: "relative",
           gridColumn: { lg: "2" },
-          gridRow: { lg: "1" },
+          gridRow: { base: "2", lg: "1" },
           minH: { base: "52vh", lg: 0 },
           minW: 0,
           display: "grid",
           placeItems: "center",
         })}
       >
-        {/* turn banner */}
-        <p
-          class={css({
-            position: "absolute",
-            top: "10px",
-            left: "50%",
-            transform: "translateX(-50%)",
-            margin: 0,
-            fontSize: "14px",
-            fontWeight: 800,
-            color: "token(colors.paperHi)",
-            background: "token(colors.timberDark)",
-            border: "1px solid token(colors.timber)",
-            borderRadius: "full",
-            padding: "8px 18px",
-            boxShadow: "0 3px 0 oklch(0 0 0 / 0.25), 0 8px 18px oklch(0.1 0.05 235 / 0.4)",
-            zIndex: 2,
-            whiteSpace: "nowrap",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-          })}
-        >
-          <span
-            class={css({
-              display: "inline-block",
-              width: "10px",
-              height: "10px",
-              borderRadius: "full",
-              boxShadow: "0 0 0 2px oklch(1 0 0 / 0.25)",
-            })}
-            style={{ background: PLAYER_DOT[current()?.id ?? ""] ?? palette.inkSoft }}
-          />
-          {prompt()}
-        </p>
-
         <Show
           when={snapshot()}
           fallback={
@@ -337,26 +307,6 @@ export default function Home() {
             />
           )}
         </Show>
-
-        {/* dice resting on the sea, low right of the island */}
-        <Show when={snapshot()?.turn.diceRoll}>
-          {(d) => (
-            <div
-              data-dice
-              class={css({
-                position: "absolute",
-                right: "5%",
-                bottom: "6%",
-                display: "flex",
-                gap: "8px",
-                filter: "drop-shadow(0 6px 8px oklch(0.1 0.05 235 / 0.45))",
-              })}
-            >
-              <DieFace value={d()[0]} size={52} />
-              <DieFace value={d()[1]} size={52} />
-            </div>
-          )}
-        </Show>
       </section>
 
       {/* right rail: players + activity */}
@@ -366,7 +316,7 @@ export default function Home() {
           flexDir: "column",
           gap: "10px",
           minH: 0,
-          gridRow: { lg: "1 / 3" },
+          gridRow: { base: "4", lg: "1 / 3" },
         })}
       >
         <section class={css({ display: "flex", flexDir: "column", gap: "8px" })}>
@@ -483,16 +433,87 @@ export default function Home() {
         </section>
       </aside>
 
-      {/* bottom tray: your hand + actions, directly under the board */}
+      {/* dock: turn status + dice, your hand, then actions — one panel under the board */}
       <section
-        class={css({
+        class={`${panel} ${css({
           display: "flex",
-          gap: "14px",
-          alignItems: "stretch",
+          gap: "16px",
+          alignItems: "center",
           gridColumn: { lg: "2" },
+          gridRow: { base: "3", lg: "2" },
           flexWrap: "wrap",
-        })}
+          padding: "10px 14px",
+        })}`}
       >
+        {/* whose turn + what's needed + the dice */}
+        <div
+          class={css({
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            minW: "230px",
+            flex: "1 1 auto",
+          })}
+        >
+          <span
+            class={css({
+              width: "36px",
+              height: "36px",
+              borderRadius: "full",
+              flexShrink: 0,
+              display: "grid",
+              placeItems: "center",
+              fontWeight: 900,
+              fontSize: "17px",
+              color: "token(colors.accentInk)",
+              boxShadow: "inset 0 -2px 0 oklch(0 0 0 / 0.2), 0 0 0 2px oklch(0 0 0 / 0.12)",
+            })}
+            style={{ background: PLAYER_DOT[current()?.id ?? ""] ?? palette.inkSoft }}
+          >
+            {current()?.name.slice(0, 1)}
+          </span>
+          <span class={css({ minW: 0 })}>
+            <span class={css({ display: "block", fontWeight: 900, fontSize: "15px" })}>
+              {myTurn() ? "Your turn" : `${current()?.name ?? "…"}'s turn`}
+              <Show when={botThinking()}>
+                <span
+                  class={css({
+                    color: "token(colors.inkSoft)",
+                    fontWeight: 600,
+                    fontSize: "13px",
+                  })}
+                >
+                  {" "}
+                  thinking…
+                </span>
+              </Show>
+            </span>
+            <span
+              class={css({
+                display: "block",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "token(colors.inkSoft)",
+              })}
+            >
+              {prompt()}
+            </span>
+          </span>
+          <span
+            data-dice
+            class={css({ display: "flex", gap: "6px", marginLeft: "auto", flexShrink: 0 })}
+          >
+            <Show when={snapshot()?.turn.diceRoll}>
+              {(d) => (
+                <>
+                  <DieFace value={d()[0]} size={38} />
+                  <DieFace value={d()[1]} size={38} />
+                </>
+              )}
+            </Show>
+          </span>
+        </div>
+
         {/* hand of resource cards */}
         <div class={css({ display: "flex", gap: "6px" })}>
           <For each={RESOURCE_TYPES}>
@@ -559,40 +580,44 @@ export default function Home() {
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "road" })}
-                disabled={!canAfford("road")}
+                disabled={!canPlaceNow("road")}
+                title={canAfford("road") ? "No open edge" : `Need ${costText("road")}`}
                 onClick={() => setPendingBuild(pendingBuild() === "road" ? null : "road")}
               >
                 <ActionIcon name="road" /> Road
-                <CostDots kind="road" />
+                <Cost kind="road" />
               </button>
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "settlement" })}
-                disabled={!canAfford("settlement")}
+                disabled={!canPlaceNow("settlement")}
+                title={canAfford("settlement") ? "No open spot" : `Need ${costText("settlement")}`}
                 onClick={() =>
                   setPendingBuild(pendingBuild() === "settlement" ? null : "settlement")
                 }
               >
                 <ActionIcon name="settle" /> Settlement
-                <CostDots kind="settlement" />
+                <Cost kind="settlement" />
               </button>
               <button
                 type="button"
                 class={btn({ sel: pendingBuild() === "city" })}
-                disabled={!canAfford("city")}
+                disabled={!canPlaceNow("city")}
+                title={canAfford("city") ? "No settlement to upgrade" : `Need ${costText("city")}`}
                 onClick={() => setPendingBuild(pendingBuild() === "city" ? null : "city")}
               >
                 <ActionIcon name="city" /> City
-                <CostDots kind="city" />
+                <Cost kind="city" />
               </button>
               <button
                 type="button"
                 class={btn()}
-                disabled={!canAfford("devCard") || (snapshot()?.devCardDeckCount ?? 0) === 0}
+                disabled={!canBuyDevNow()}
+                title={canAfford("devCard") ? "Deck is empty" : `Need ${costText("devCard")}`}
                 onClick={buyDevCard}
               >
                 <ResourceIcon type="dev" size={20} /> Dev
-                <CostDots kind="devCard" />
+                <Cost kind="devCard" />
               </button>
               <button type="button" class={btn()} onClick={() => setTradeOpen(true)}>
                 <ActionIcon name="trade" /> Trade

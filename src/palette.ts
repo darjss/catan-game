@@ -29,6 +29,7 @@ export const palette = {
     player_0: "oklch(0.56 0.15 250)",
     player_1: "oklch(0.56 0.2 25)",
     player_2: "oklch(0.68 0.15 62)",
+    player_3: "oklch(0.52 0.16 305)",
   },
   terrain: {
     wood: "oklch(0.52 0.1 160)",

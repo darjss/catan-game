@@ -34,7 +34,7 @@ export function TileArt(props: { type: string; seed: string }) {
       preserveAspectRatio="xMidYMid slice"
     >
       <image
-        href="/assets/terrain-atlas.png"
+        href="/assets/terrain-atlas.webp"
         x="0"
         y="0"
         width="1536"
@@ -209,7 +209,7 @@ export function ResourceIcon(p: { type: ResourceType | "dev"; size?: number }) {
         width: `${s}px`,
         height: `${s}px`,
         "vertical-align": "-0.2em",
-        "background-image": "url(/assets/resource-sprites.png)",
+        "background-image": "url(/assets/resource-sprites.webp)",
         "background-size": "300% 200%",
         "background-position": `${cx}% ${cy}%`,
         "background-repeat": "no-repeat",

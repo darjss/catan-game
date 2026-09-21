@@ -115,7 +115,7 @@ export default function Board(props: {
                 />
               </Show>
               <Show when={t.numberToken != null && !t.hasRobber}>
-                <g transform={`translate(${c().x} ${c().y})`}>
+                <g transform={`translate(${c().x} ${c().y})`} pointer-events="none">
                   <circle cy="0.05" r="0.37" fill="oklch(0 0 0 / 0.16)" />
                   <circle
                     r="0.36"
@@ -152,6 +152,7 @@ export default function Board(props: {
               <Show when={t.hasRobber}>
                 <g
                   class="robber-move"
+                  pointer-events="none"
                   style={`transform: translate(${c().x}px, ${c().y - 0.02}px)`}
                 >
                   <Robber x={0} y={0} />

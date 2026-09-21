@@ -1,11 +1,17 @@
 import { createSignal } from "solid-js";
-import { Game, type GameEvent, type PlayerState, type ResourceType } from "catan-game-engine";
+import {
+  Game,
+  generateBoard,
+  type GameEvent,
+  type PlayerState,
+  type ResourceType,
+} from "catan-game-engine";
 import { botDiscard, botStep } from "./bot";
 import { RESOURCE_TYPES, takeSnapshot, type Snapshot } from "./model";
 
 export const HUMAN_ID = "player_0";
-const BOT_NAMES = ["Ada", "Bruno"];
-const BOT_IDS = new Set(["player_1", "player_2"]);
+const BOT_NAMES = ["Ada", "Bruno", "Cleo"];
+const BOT_IDS = new Set(["player_1", "player_2", "player_3"]);
 
 export type PendingBuild =
   | "road"
@@ -162,8 +168,49 @@ function act(fn: (g: Game) => void) {
   return true;
 }
 
+// Axial neighbor deltas for the pointy-top layout the engine bakes into ids.
+const HEX_DIRS = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, -1],
+  [-1, 1],
+] as const;
+const RED_TOKENS = new Set([6, 8]);
+
+/** True when no two red (6/8) number tokens share an edge on this board. */
+function tokensAreSpread(seed: number): boolean {
+  const board = generateBoard(seed);
+  const byCoord = new Map(
+    [...board.tiles.values()].map((t) => [`${t.coordinate.q},${t.coordinate.r}`, t]),
+  );
+  return [...board.tiles.values()].every(
+    (t) =>
+      !(t.numberToken != null && RED_TOKENS.has(t.numberToken)) ||
+      HEX_DIRS.every(([dq, dr]) => {
+        const n = byCoord.get(`${t.coordinate.q + dq},${t.coordinate.r + dr}`);
+        return !(n?.numberToken != null && RED_TOKENS.has(n.numberToken));
+      }),
+  );
+}
+
+/**
+ * Pick a seed whose engine-generated board has no adjacent 6/8 tokens. The
+ * engine offers no balanced-generation option, so we try seeds until one
+ * qualifies — capped so a pathological stream can't spin forever.
+ */
+function pickSeed(): number {
+  let seed = Math.floor(Math.random() * 2 ** 31);
+  for (let i = 0; i < 200; i++) {
+    if (tokensAreSpread(seed)) return seed;
+    seed = (seed + 7919) % 2 ** 31;
+  }
+  return seed;
+}
+
 export function newGame(yourName = "You") {
-  game = new Game([yourName, ...BOT_NAMES], Math.floor(Math.random() * 2 ** 31));
+  game = new Game([yourName, ...BOT_NAMES], pickSeed());
   seenEvents = 0;
   setLog([]);
   setPendingBuild(null);
@@ -365,6 +412,35 @@ export function computeLegalTargets(): LegalTargets {
     }
   }
   return out;
+}
+
+export type BuildKind = "road" | "settlement" | "city";
+
+/**
+ * Whether the human could place `kind` right now — at least one spot passes
+ * the engine's own validation (resources AND position). Call inside a
+ * tracking scope.
+ */
+export function canPlaceNow(kind: BuildKind): boolean {
+  if (!game) return false;
+  const s = game.getState();
+  if (s.turn.phase !== "main" || !s.turn.hasRolled) return false;
+  if (s.players[s.turn.currentPlayerIndex].id !== HUMAN_ID) return false;
+  const action = kind === "road" ? "placeRoad" : kind === "city" ? "placeCity" : "placeSettlement";
+  const ids = kind === "road" ? s.board.edges.keys() : s.board.vertices.keys();
+  for (const id of ids) {
+    if (game.canPerformAction(action, id).valid) return true;
+  }
+  return false;
+}
+
+/** Whether the human can buy a dev card right now (engine validation). */
+export function canBuyDevNow(): boolean {
+  if (!game) return false;
+  const s = game.getState();
+  if (s.turn.phase !== "main" || !s.turn.hasRolled) return false;
+  if (s.players[s.turn.currentPlayerIndex].id !== HUMAN_ID) return false;
+  return game.canPerformAction("buyDevCard").valid;
 }
 
 /** Best bank/port trade ratio the human has for a resource. */
