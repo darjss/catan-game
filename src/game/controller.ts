@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createEffect, createRoot, createSignal, until } from "solid-js";
 import {
   Game,
   generateBoard,
@@ -239,39 +239,84 @@ function refresh() {
 
 let seenEvents = 0;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-let driving = false;
-async function driveBots() {
-  if (driving || !game) return;
-  driving = true;
-  try {
-    while (game && !game.isGameOver()) {
-      const s = game.getState();
-
-      if (s.turn.phase === "robberDiscard") {
-        const discarder = s.turn.mustDiscardPlayers.find((id) => BOT_IDS.has(id));
-        if (!discarder) break; // only humans left to discard
-        botDiscard(game, discarder);
-        refresh();
-        await sleep(400);
-        continue;
-      }
-
-      const current = s.players[s.turn.currentPlayerIndex];
-      if (!BOT_IDS.has(current.id)) break;
-      setBotThinking(current.name);
-      await sleep(350);
-      await botStep(game, current);
-      refresh();
-      await sleep(500);
-    }
-  } finally {
-    driving = false;
-    setBotThinking(null);
-    refresh();
-  }
+/** Sleep that resolves early when aborted. */
+function pace(ms: number, signal: AbortSignal) {
+  return new Promise<void>((res) => {
+    const t = setTimeout(res, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(t);
+        res();
+      },
+      { once: true },
+    );
+  });
 }
+
+/** True when a bot has work: it's a bot's turn, or a bot must discard. */
+function botsNeedWork(s: Snapshot | null): boolean {
+  if (!s || s.winner) return false;
+  if (s.turn.phase === "robberDiscard")
+    return s.turn.mustDiscardPlayers.some((id) => BOT_IDS.has(id));
+  return BOT_IDS.has(s.players[s.turn.currentPlayerIndex].id);
+}
+
+/** Bumped on every new game — restarting the driver is a compute dependency
+ *  change, and the previous loop is aborted by the effect's cleanup. */
+const [gameId, setGameId] = createSignal(0);
+
+/**
+ * Bot driver. `until` parks the loop on the snapshot signal instead of being
+ * poked from every action, and the abort unwinds pacing sleeps and any
+ * in-flight Jev call. Starting a new game bumps `gameId`, which re-runs the
+ * effect — its cleanup aborts the old loop so a stale driver can't move
+ * pieces in the fresh game.
+ */
+createRoot(() => {
+  createEffect(
+    () => gameId(),
+    () => {
+      const g = game;
+      if (!g) return;
+      const ac = new AbortController();
+      void (async () => {
+        while (!g.isGameOver()) {
+          try {
+            await until(() => botsNeedWork(snapshot()), { signal: ac.signal });
+          } catch {
+            return; // aborted
+          }
+          if (ac.signal.aborted) return;
+          const s = g.getState();
+          if (s.turn.phase === "robberDiscard") {
+            const id = s.turn.mustDiscardPlayers.find((x) => BOT_IDS.has(x));
+            if (id) {
+              botDiscard(g, id);
+              refresh();
+              await pace(400, ac.signal);
+            }
+            continue;
+          }
+          const current = s.players[s.turn.currentPlayerIndex];
+          if (!BOT_IDS.has(current.id)) continue;
+          setBotThinking(current.name);
+          try {
+            await pace(350, ac.signal);
+            await botStep(g, current, ac.signal);
+          } finally {
+            setBotThinking(null);
+          }
+          if (ac.signal.aborted) return;
+          refresh();
+          await pace(500, ac.signal);
+        }
+      })();
+      // cleanup runs before the next game and on disposal
+      return () => ac.abort();
+    },
+  );
+});
 
 /** Apply a human action; engine errors surface as a toast, not a crash. */
 function act(fn: (g: Game) => void) {
@@ -284,7 +329,6 @@ function act(fn: (g: Game) => void) {
     return false;
   }
   refresh();
-  void driveBots();
   return true;
 }
 
@@ -341,7 +385,7 @@ export function newGame(yourName = "You") {
   rbFirstEdge = null;
   refresh();
   pushEntry({ icon: "flag", parts: ["New game — place your first settlement"] });
-  void driveBots();
+  setGameId((v) => v + 1);
 }
 
 // --- human inputs -----------------------------------------------------------
@@ -543,12 +587,12 @@ export type BuildKind = "road" | "settlement" | "city";
  * tracking scope.
  */
 export function canPlaceNow(kind: BuildKind): boolean {
-  if (!game) return false;
-  const s = game.getState();
+  const s = snapshot();
+  if (!s || !game) return false;
   if (s.turn.phase !== "main" || !s.turn.hasRolled) return false;
   if (s.players[s.turn.currentPlayerIndex].id !== HUMAN_ID) return false;
   const action = kind === "road" ? "placeRoad" : kind === "city" ? "placeCity" : "placeSettlement";
-  const ids = kind === "road" ? s.board.edges.keys() : s.board.vertices.keys();
+  const ids = kind === "road" ? s.edges.map((e) => e.id) : s.vertices.map((v) => v.id);
   for (const id of ids) {
     if (game.canPerformAction(action, id).valid) return true;
   }
@@ -557,8 +601,8 @@ export function canPlaceNow(kind: BuildKind): boolean {
 
 /** Whether the human can buy a dev card right now (engine validation). */
 export function canBuyDevNow(): boolean {
-  if (!game) return false;
-  const s = game.getState();
+  const s = snapshot();
+  if (!s || !game) return false;
   if (s.turn.phase !== "main" || !s.turn.hasRolled) return false;
   if (s.players[s.turn.currentPlayerIndex].id !== HUMAN_ID) return false;
   return game.canPerformAction("buyDevCard").valid;

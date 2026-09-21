@@ -139,7 +139,14 @@ function score(game: Game, m: Move): number {
  * Apply one bot move: ask Jev over the full legal move list, fall back to a
  * scored heuristic, and keep trying options until one applies cleanly.
  */
-export async function botStep(game: Game, bot: PlayerState): Promise<void> {
+/** Rejects as soon as the signal aborts — used to cut off the Jev wait. */
+function aborted(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) =>
+    signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
+  );
+}
+
+export async function botStep(game: Game, bot: PlayerState, signal?: AbortSignal): Promise<void> {
   const moves = legalMoves(game);
   if (moves.length === 0) return;
 
@@ -148,22 +155,25 @@ export async function botStep(game: Game, bot: PlayerState): Promise<void> {
 
   if (moves.length > 1) {
     try {
-      const choice = await chooseBotMove({
+      const ask = chooseBotMove({
         state: summarize(game, bot),
         instructions: instructionsFor(game),
         options: Object.fromEntries(moves.map((m) => [m.id, m.info ?? m.label])),
       });
+      const choice = signal ? await Promise.race([ask, aborted(signal)]) : await ask;
       const picked = moves.find((m) => m.id === choice);
       if (picked) {
         ordered = [picked, ...ranked.filter((m) => m !== picked)];
         console.info(`[bot-ai] jev picked: ${picked.label}`);
       }
     } catch (e) {
+      if (signal?.aborted) return; // game was disposed — don't apply anything
       // gateway down / no key — heuristics carry on
       console.warn("[bot-ai] jev unavailable, using heuristic:", e);
     }
   }
 
+  if (signal?.aborted) return;
   for (const m of ordered.concat(moves)) {
     try {
       m.apply(game);
