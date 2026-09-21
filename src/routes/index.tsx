@@ -34,6 +34,7 @@ import {
   playCard,
   producedTiles,
   robberPick,
+  resumeOrNew,
   rollDice,
   setCardPick,
   setPendingBuild,
@@ -160,7 +161,7 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = createSignal(false);
   const [logCollapsed, setLogCollapsed] = createSignal(false);
   onSettled(() => {
-    newGame();
+    resumeOrNew();
   });
   // Keep the game log pinned to the newest line.
   createEffect(

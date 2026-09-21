@@ -376,8 +376,57 @@ function pickSeed(): number {
   return seed;
 }
 
-export function newGame(yourName = "You") {
-  game = new Game([yourName, ...BOT_NAMES], pickSeed());
+// --- persistence ------------------------------------------------------------
+// The game lives in this tab's memory — a mobile browser evicting the tab
+// wipes it. Every mutation, human or bot, goes through one of these Game
+// methods, so wrapping them gives a complete, deterministic action log:
+// same seed + same actions = same game (the engine's RNG is seeded).
+const STORAGE_KEY = "catan:game:v1";
+const RECORDED_METHODS = [
+  "rollDice",
+  "placeSettlement",
+  "placeCity",
+  "placeRoad",
+  "buyDevCard",
+  "playKnight",
+  "playRoadBuilding",
+  "playYearOfPlenty",
+  "playMonopoly",
+  "discardResources",
+  "moveRobber",
+  "tradeWithBank",
+  "endTurn",
+] as const;
+
+let actionLog: [string, unknown[]][] = [];
+let replaying = false;
+
+function persistGame(names: string[], seed: number) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ names, seed, actions: actionLog }));
+  } catch {
+    // storage full or private mode — game keeps working, just won't resume
+  }
+}
+
+/** Wrap a Game so every recorded method appends [method, args] to the log. */
+function instrument(g: Game, names: string[], seed: number) {
+  for (const m of RECORDED_METHODS) {
+    const orig = (g[m] as (...a: unknown[]) => unknown).bind(g);
+    (g as unknown as Record<string, (...a: unknown[]) => unknown>)[m] = (...args: unknown[]) => {
+      const r = orig(...args);
+      if (!replaying) {
+        actionLog.push([m, args]);
+        persistGame(names, seed);
+      }
+      return r;
+    };
+  }
+}
+
+/** Shared activation: swap in a game, reset UI state, kick the bot driver. */
+function activate(g: Game, names: string[], seed: number) {
+  game = g;
   seenEvents = 0;
   prevSnap = null;
   setLog([]);
@@ -386,9 +435,47 @@ export function newGame(yourName = "You") {
   setTradeOpen(false);
   setCardPick(null);
   rbFirstEdge = null;
+  instrument(g, names, seed);
   refresh();
-  pushEntry({ icon: "flag", parts: ["New game — place your first settlement"] });
   setGameId((v) => v + 1);
+}
+
+export function newGame(yourName = "You") {
+  const names = [yourName, ...BOT_NAMES];
+  const seed = pickSeed();
+  actionLog = [];
+  persistGame(names, seed);
+  activate(new Game(names, seed), names, seed);
+  pushEntry({ icon: "flag", parts: ["New game — place your first settlement"] });
+}
+
+/** On load: rebuild the saved game by replaying its action log on the same
+ *  seed, or start fresh if there's nothing (or the log is corrupted). */
+export function resumeOrNew() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return newGame();
+    const saved = JSON.parse(raw) as {
+      names: string[];
+      seed: number;
+      actions: [string, unknown[]][];
+    };
+    const g = new Game(saved.names, saved.seed);
+    replaying = true;
+    try {
+      for (const [m, args] of saved.actions) {
+        (g[m as keyof Game] as (...a: unknown[]) => unknown)(...args);
+      }
+    } finally {
+      replaying = false;
+    }
+    actionLog = saved.actions;
+    activate(g, saved.names, saved.seed);
+    pushEntry({ icon: "flag", parts: ["Resumed your game"] });
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    newGame();
+  }
 }
 
 // --- human inputs -----------------------------------------------------------
