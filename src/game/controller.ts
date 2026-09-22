@@ -380,8 +380,10 @@ function pickSeed(): number {
 // The game lives in this tab's memory — a mobile browser evicting the tab
 // wipes it. Every mutation, human or bot, goes through one of these Game
 // methods, so wrapping them gives a complete, deterministic action log:
-// same seed + same actions = same game (the engine's RNG is seeded).
-const STORAGE_KEY = "catan:game:v1";
+// same seed + same actions = same game. Determinism is guaranteed by the
+// pnpm patch on catan-game-engine: all RNG draws seed from the game seed
+// plus a draw counter on state, never Date.now().
+const STORAGE_KEY = "catan:game:v3";
 const RECORDED_METHODS = [
   "rollDice",
   "placeSettlement",
@@ -398,7 +400,9 @@ const RECORDED_METHODS = [
   "endTurn",
 ] as const;
 
-let actionLog: [string, unknown[]][] = [];
+type LoggedAction = [string, unknown[]];
+
+let actionLog: LoggedAction[] = [];
 let replaying = false;
 
 function persistGame(names: string[], seed: number) {
@@ -409,7 +413,7 @@ function persistGame(names: string[], seed: number) {
   }
 }
 
-/** Wrap a Game so every recorded method appends [method, args] to the log. */
+/** Wrap a Game so every recorded method appends [method, args]. */
 function instrument(g: Game, names: string[], seed: number) {
   for (const m of RECORDED_METHODS) {
     const orig = (g[m] as (...a: unknown[]) => unknown).bind(g);
@@ -458,13 +462,20 @@ export function resumeOrNew() {
     const saved = JSON.parse(raw) as {
       names: string[];
       seed: number;
-      actions: [string, unknown[]][];
+      actions: LoggedAction[];
     };
     const g = new Game(saved.names, saved.seed);
     replaying = true;
     try {
-      for (const [m, args] of saved.actions) {
-        (g[m as keyof Game] as (...a: unknown[]) => unknown)(...args);
+      for (let i = 0; i < saved.actions.length; i++) {
+        const [m, args] = saved.actions[i];
+        try {
+          (g[m as keyof Game] as (...a: unknown[]) => unknown)(...args);
+        } catch (err) {
+          throw new Error(`replay failed at action ${i} (${m}): ${(err as Error).message}`, {
+            cause: err,
+          });
+        }
       }
     } finally {
       replaying = false;
@@ -472,9 +483,19 @@ export function resumeOrNew() {
     actionLog = saved.actions;
     activate(g, saved.names, saved.seed);
     pushEntry({ icon: "flag", parts: ["Resumed your game"] });
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.error("[resume] replay failed — starting fresh:", err);
+    // Quarantine, don't wipe: a failed save may be recoverable (e.g. after an
+    // engine fix) and erasing it turns a compatibility bug into data loss.
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) localStorage.setItem(`${STORAGE_KEY}:failed`, raw);
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // no storage — nothing to quarantine
+    }
     newGame();
+    pushEntry({ icon: "warn", parts: ["Couldn't resume your saved game — started a new one"] });
   }
 }
 

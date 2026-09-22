@@ -1142,6 +1142,19 @@ function LogIcon(props: { kind: string }) {
           />
         </svg>
       );
+    case "warn":
+      return (
+        <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+          <path
+            d="M12 4 L21 20 H3 Z M12 10 v5 m0 2 v1"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.4"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      );
     default:
       return <ActionIcon name="end" size={size} />;
   }

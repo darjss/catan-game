@@ -179,7 +179,7 @@ overrides:
   vitest@*: 4.1.11
 
 patchedDependencies:
-  catan-game-engine@0.3.0: 1d1a4b1babb18ee5eb9f496263e3add6be44e3739b8430e73dd1a70d5bb89e7a
+  catan-game-engine@0.3.0: 313d10e49b8f27bb876cdb7daf6d06aa8f41c18193d0049e5e28b552b216d9a5
 
 importers:
 
@@ -205,7 +205,7 @@ importers:
         version: 7.0.106(zod@4.6.5)
       catan-game-engine:
         specifier: ^0.3.0
-        version: 0.3.0(patch_hash=1d1a4b1babb18ee5eb9f496263e3add6be44e3739b8430e73dd1a70d5bb89e7a)(@types/node@26.6.1)
+        version: 0.3.0(patch_hash=313d10e49b8f27bb876cdb7daf6d06aa8f41c18193d0049e5e28b552b216d9a5)(@types/node@26.6.1)
       solid-js:
         specifier: ^2.0.0-rc.9
         version: 2.0.0-rc.9
@@ -5301,7 +5301,7 @@ snapshots:
 
   caniuse-lite@1.0.30001810: {}
 
-  catan-game-engine@0.3.0(patch_hash=1d1a4b1babb18ee5eb9f496263e3add6be44e3739b8430e73dd1a70d5bb89e7a)(@types/node@26.6.1):
+  catan-game-engine@0.3.0(patch_hash=313d10e49b8f27bb876cdb7daf6d06aa8f41c18193d0049e5e28b552b216d9a5)(@types/node@26.6.1):
     dependencies:
       chalk: 5.6.2
       inquirer: 9.3.8(@types/node@26.6.1)
