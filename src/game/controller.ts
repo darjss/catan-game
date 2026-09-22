@@ -401,13 +401,25 @@ const RECORDED_METHODS = [
 ] as const;
 
 type LoggedAction = [string, unknown[]];
+type SavedGame = { names: string[]; seed: number; actions: LoggedAction[]; tab: string };
 
 let actionLog: LoggedAction[] = [];
 let replaying = false;
+// Each tab owns its writes. A second tab resuming the same save would
+// otherwise diverge and the two tabs would clobber each other's log.
+const TAB_ID = crypto.randomUUID();
 
-function persistGame(names: string[], seed: number) {
+function persistGame(names: string[], seed: number, force = false) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ names, seed, actions: actionLog }));
+    const existing = localStorage.getItem(STORAGE_KEY);
+    if (existing && !force) {
+      const other = JSON.parse(existing) as SavedGame;
+      // A foreign save that's ahead of us belongs to a live tab further
+      // along — don't clobber it. Behind us, it's stale and safe to replace.
+      if (other.tab !== TAB_ID && other.actions.length > actionLog.length) return;
+    }
+    const save: SavedGame = { names, seed, actions: actionLog, tab: TAB_ID };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
   } catch {
     // storage full or private mode — game keeps working, just won't resume
   }
@@ -448,7 +460,7 @@ export function newGame(yourName = "You") {
   const names = [yourName, ...BOT_NAMES];
   const seed = pickSeed();
   actionLog = [];
-  persistGame(names, seed);
+  persistGame(names, seed, true);
   activate(new Game(names, seed), names, seed);
   pushEntry({ icon: "flag", parts: ["New game — place your first settlement"] });
 }
@@ -487,9 +499,15 @@ export function resumeOrNew() {
     console.error("[resume] replay failed — starting fresh:", err);
     // Quarantine, don't wipe: a failed save may be recoverable (e.g. after an
     // engine fix) and erasing it turns a compatibility bug into data loss.
+    // Storing the error alongside it means the next report has evidence.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) localStorage.setItem(`${STORAGE_KEY}:failed`, raw);
+      if (raw) {
+        localStorage.setItem(
+          `${STORAGE_KEY}:failed`,
+          JSON.stringify({ error: String(err), save: JSON.parse(raw) }),
+        );
+      }
       localStorage.removeItem(STORAGE_KEY);
     } catch {
       // no storage — nothing to quarantine
