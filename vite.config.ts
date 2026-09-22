@@ -96,4 +96,7 @@ export default defineConfig({
     target: "esnext",
     assetsInlineLimit: 0,
   },
+  define: {
+    __BUILD_ID__: JSON.stringify(new Date().toISOString()),
+  },
 });

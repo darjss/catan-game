@@ -384,6 +384,7 @@ function pickSeed(): number {
 // pnpm patch on catan-game-engine: all RNG draws seed from the game seed
 // plus a draw counter on state, never Date.now().
 const STORAGE_KEY = "catan:game:v3";
+const CRASH_KEY = `${STORAGE_KEY}:crash`;
 const RECORDED_METHODS = [
   "rollDice",
   "placeSettlement",
@@ -401,13 +402,37 @@ const RECORDED_METHODS = [
 ] as const;
 
 type LoggedAction = [string, unknown[]];
-type SavedGame = { names: string[]; seed: number; actions: LoggedAction[]; tab: string };
+type SavedGame = { names: string[]; seed: number; actions: LoggedAction[]; tab: string; v: string };
 
 let actionLog: LoggedAction[] = [];
 let replaying = false;
 // Each tab owns its writes. A second tab resuming the same save would
 // otherwise diverge and the two tabs would clobber each other's log.
 const TAB_ID = crypto.randomUUID();
+
+// Crash breadcrumbs: if the app dies mid-game, the next load reports what
+// killed it instead of silently resuming (or silently starting over).
+if (typeof window !== "undefined") {
+  console.log(`[catan] build ${__BUILD_ID__}`);
+  const recordCrash = (kind: string, detail: unknown) => {
+    try {
+      localStorage.setItem(
+        CRASH_KEY,
+        JSON.stringify({
+          kind,
+          detail: String(detail),
+          build: __BUILD_ID__,
+          actions: actionLog.length,
+          at: new Date().toISOString(),
+        }),
+      );
+    } catch {
+      // no storage — nothing to record
+    }
+  };
+  window.addEventListener("error", (e) => recordCrash("error", e.message));
+  window.addEventListener("unhandledrejection", (e) => recordCrash("rejection", e.reason));
+}
 
 function persistGame(names: string[], seed: number, force = false) {
   try {
@@ -418,7 +443,7 @@ function persistGame(names: string[], seed: number, force = false) {
       // along — don't clobber it. Behind us, it's stale and safe to replace.
       if (other.tab !== TAB_ID && other.actions.length > actionLog.length) return;
     }
-    const save: SavedGame = { names, seed, actions: actionLog, tab: TAB_ID };
+    const save: SavedGame = { names, seed, actions: actionLog, tab: TAB_ID, v: __BUILD_ID__ };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(save));
   } catch {
     // storage full or private mode — game keeps working, just won't resume
@@ -469,6 +494,24 @@ export function newGame(yourName = "You") {
  *  seed, or start fresh if there's nothing (or the log is corrupted). */
 export function resumeOrNew() {
   try {
+    // Surface a recorded crash from the previous session in the log.
+    const crash = localStorage.getItem(CRASH_KEY);
+    if (crash) {
+      localStorage.removeItem(CRASH_KEY);
+      try {
+        const c = JSON.parse(crash) as { detail: string; build: string; actions: number };
+        queueMicrotask(() =>
+          pushEntry({
+            icon: "warn",
+            parts: [
+              `Recovered from a crash (build ${c.build}, ${c.actions} actions in): ${c.detail}`,
+            ],
+          }),
+        );
+      } catch {
+        // malformed crash record — ignore
+      }
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return newGame();
     const saved = JSON.parse(raw) as {
